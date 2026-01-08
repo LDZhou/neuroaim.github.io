@@ -1,143 +1,225 @@
 // ==================== NOISE SYSTEM ====================
-// Dynamic visual noise for V1 cortex training
+// Advanced Gabor Noise Field & Strobe Logic
+// Optimized with Pre-rendering Cache for High Performance
 
-// Static chaos noise (for background setting)
-let chaosNoiseCanvas = document.createElement('canvas');
-let chaosNoiseCtx = chaosNoiseCanvas.getContext('2d');
-let chaosNoiseGenerated = false;
-
-// Dynamic pink noise texture (for Mode 1 overlay)
-let pinkNoiseCanvas = document.createElement('canvas');
-let pinkNoiseCtx = pinkNoiseCanvas.getContext('2d');
-const NOISE_SIZE = 512;  // Fixed size texture for performance
-
-// Initialize pink noise texture (1/f noise approximation)
-function initPinkNoiseTexture() {
-    pinkNoiseCanvas.width = NOISE_SIZE;
-    pinkNoiseCanvas.height = NOISE_SIZE;
+const NoiseSystem = {
+    particles: [], 
+    w: 0, h: 0,
+    strobeTimer: 0,
+    currentStrobePeriod: 0,
+    isBlindPhase: false,
+    speedScale: 1.0, 
     
-    const idata = pinkNoiseCtx.createImageData(NOISE_SIZE, NOISE_SIZE);
-    const buffer = new Uint32Array(idata.data.buffer);
+    gaborCache: null,
     
-    // Generate noise with varying opacity for "shimmering" effect
-    for (let i = 0; i < buffer.length; i++) {
-        // Generate grayscale noise
-        const val = Math.floor(Math.random() * 255);
-        // Random alpha for flickering effect (20-80 range)
-        const alpha = Math.floor(Math.random() * 60 + 20);
-        // Format: 0xAABBGGRR (Little Endian)
-        buffer[i] = (alpha << 24) | (val << 16) | (val << 8) | val;
-    }
+    init(width, height) {
+        this.w = width;
+        this.h = height;
+        this.createGaborCache(); 
+        this.regenerate();
+    },
     
-    pinkNoiseCtx.putImageData(idata, 0, 0);
-}
+    setSpeedScale(scale) {
+        this.speedScale = scale;
+    },
 
-// Generate static chaos noise for background
-function generateChaosNoise(width, height) {
-    chaosNoiseCanvas.width = width;
-    chaosNoiseCanvas.height = height;
-    
-    chaosNoiseCtx.fillStyle = '#0a0a0f';
-    chaosNoiseCtx.fillRect(0, 0, width, height);
-
-    // Layer 1: Dust particles
-    const dustDensity = 5000;
-    for (let i = 0; i < dustDensity; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const brightness = Math.random() * 80 + 40;
-        chaosNoiseCtx.fillStyle = `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.2 + 0.05})`;
-        chaosNoiseCtx.fillRect(x, y, Math.random() * 2 + 0.5, Math.random() * 2 + 0.5);
-    }
-
-    // Layer 2: Fragments
-    const fragmentDensity = 1500;
-    for (let i = 0; i < fragmentDensity; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const size = Math.random() * 8 + 2;
-        const brightness = Math.random() * 80 + 40;
-        chaosNoiseCtx.fillStyle = `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.35 + 0.1})`;
+    createGaborCache() {
+        const baseSize = CFG.noise.gaborField.size; 
+        const canvasSize = baseSize * 4; 
+        const cx = canvasSize / 2;
+        const cy = canvasSize / 2;
         
-        if (Math.random() > 0.5) {
-            chaosNoiseCtx.fillRect(x, y, size * 1.5, size);
+        this.gaborCache = document.createElement('canvas');
+        this.gaborCache.width = canvasSize;
+        this.gaborCache.height = canvasSize;
+        const ctx = this.gaborCache.getContext('2d');
+        
+        const baseColor = '150, 150, 150'; 
+        ctx.strokeStyle = `rgb(${baseColor})`; 
+        ctx.lineWidth = 3;
+        const step = 6;
+        
+        ctx.beginPath();
+        for (let i = -canvasSize; i < canvasSize; i += step) {
+            ctx.moveTo(cx + i, 0);
+            ctx.lineTo(cx + i, canvasSize);
+        }
+        ctx.stroke();
+        
+        ctx.globalCompositeOperation = 'destination-in';
+        const radius = baseSize; 
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        g.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        g.addColorStop(0.5, 'rgba(0, 0, 0, 0.8)');
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvasSize, canvasSize);
+        ctx.globalCompositeOperation = 'source-over';
+    },
+
+    regenerate() {
+        this.particles = [];
+        const level = settings.noiseLevel;
+        const mode = currentMode;
+        
+        if (!this.gaborCache) this.createGaborCache();
+        
+        if (level === 0) return; // Clean
+
+        if (mode === 1) {
+            this.generateGaborParticles(this.w, this.h, level);
+        } else if (mode === 2) {
+            // Mode 2 pure tracking has no noise usually (level 1 only)
+            if (level === 1) return;
         } else {
-            chaosNoiseCtx.beginPath();
-            chaosNoiseCtx.arc(x, y, size / 2, 0, Math.PI * 2);
-            chaosNoiseCtx.fill();
+            // Mode 3 and Mode 4 use Pixel Decoys
+            this.generateDecoyParticles(this.w, this.h, level);
         }
-    }
+    },
 
-    // Layer 3: Splotches
-    const splotchDensity = 200;
-    for (let i = 0; i < splotchDensity; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const size = Math.random() * 60 + 20;
-        const brightness = Math.random() * 60 + 20;
+    generateGaborParticles(w, h, level) {
+        if (level === 1) return; 
+
+        const densityMap = { 2: 60, 3: 200, 4: 200 };
+        const count = densityMap[level] || 50;
+        const baseSize = CFG.noise.gaborField.size;
         
-        const gradient = chaosNoiseCtx.createRadialGradient(x, y, 0, x, y, size);
-        gradient.addColorStop(0, `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.2 + 0.05})`);
-        gradient.addColorStop(0.5, `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.1})`);
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
-        
-        chaosNoiseCtx.fillStyle = gradient;
-        chaosNoiseCtx.beginPath();
-        chaosNoiseCtx.arc(x, y, size, 0, Math.PI * 2);
-        chaosNoiseCtx.fill();
-    }
-
-    // Layer 4: Streaks
-    const streakDensity = 80;
-    for (let i = 0; i < streakDensity; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const size = Math.random() * 100 + 30;
-        const angle = Math.random() * Math.PI;
-        const brightness = Math.random() * 50 + 30;
-
-        chaosNoiseCtx.save();
-        chaosNoiseCtx.translate(x, y);
-        chaosNoiseCtx.rotate(angle);
-        chaosNoiseCtx.fillStyle = `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.15 + 0.03})`;
-        chaosNoiseCtx.fillRect(-size / 2, -1, size, 2);
-        chaosNoiseCtx.restore();
-    }
-
-    chaosNoiseGenerated = true;
-}
-
-// Draw dynamic noise overlay (Mode 1 only)
-// This creates a "TV static" effect by randomly sampling from the noise texture
-function drawDynamicNoise(ctx, width, height) {
-    if (currentMode !== 1 || !settings.dynamicNoise) return;
-    
-    // Random offset each frame for "scrolling" effect
-    const randX = Math.floor(Math.random() * (NOISE_SIZE - Math.min(width, NOISE_SIZE)));
-    const randY = Math.floor(Math.random() * (NOISE_SIZE - Math.min(height, NOISE_SIZE)));
-    
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 0.12;  // Subtle but noticeable
-    
-    // Tile the noise if screen is larger than texture
-    const tilesX = Math.ceil(width / NOISE_SIZE);
-    const tilesY = Math.ceil(height / NOISE_SIZE);
-    
-    for (let tx = 0; tx < tilesX; tx++) {
-        for (let ty = 0; ty < tilesY; ty++) {
-            ctx.drawImage(
-                pinkNoiseCanvas,
-                randX, randY,
-                NOISE_SIZE, NOISE_SIZE,
-                tx * NOISE_SIZE, ty * NOISE_SIZE,
-                NOISE_SIZE, NOISE_SIZE
-            );
+        for (let i = 0; i < count; i++) {
+            this.particles.push({
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx: (Math.random() - 0.5) * CFG.noise.baseSpeed, 
+                vy: (Math.random() - 0.5) * CFG.noise.baseSpeed,
+                changeDirTimer: Math.random() * 3000,
+                angle: Math.random() * Math.PI, 
+                isHorizontal: Math.random() > 0.3,
+                size: baseSize * (0.8 + Math.random() * 0.4),
+                isGabor: true
+            });
         }
-    }
-    
-    ctx.restore();
-}
+    },
 
-// Initialize noise on load
-initPinkNoiseTexture();
+    generateDecoyParticles(w, h, level) {
+        const density = level === 2 ? 80 : 200;
+        for (let i = 0; i < density; i++) {
+            const type = Math.random();
+            this.particles.push({
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                changeDirTimer: Math.random() * 3000,
+                type: type,
+                isPixel: true
+            });
+        }
+    },
+
+    update(dt) {
+        const level = settings.noiseLevel;
+        if (level === 0) return;
+
+        // 1. Move Particles (Apply Speed Scale)
+        if (this.particles.length > 0) {
+            const margin = 50;
+            this.particles.forEach(p => {
+                p.x += p.vx * (dt/16) * this.speedScale;
+                p.y += p.vy * (dt/16) * this.speedScale;
+                
+                if (p.x < -margin) p.x = this.w + margin;
+                if (p.x > this.w + margin) p.x = -margin;
+                if (p.y < -margin) p.y = this.h + margin;
+                if (p.y > this.h + margin) p.y = -margin;
+                
+                p.changeDirTimer -= dt;
+                if (p.changeDirTimer <= 0) {
+                    const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+                    const currentAngle = Math.atan2(p.vy, p.vx);
+                    const newAngle = currentAngle + (Math.random() - 0.5) * Math.PI;
+                    
+                    p.vx = Math.cos(newAngle) * speed;
+                    p.vy = Math.sin(newAngle) * speed;
+                    p.changeDirTimer = 2000 + Math.random() * 1000;
+                }
+            });
+        }
+
+        // 2. Strobe Logic
+        if (level === 4) {
+            this.strobeTimer += dt;
+            if (this.strobeTimer >= this.currentStrobePeriod) {
+                this.strobeTimer = 0;
+                const freq = CFG.noise.strobe.freqMin + Math.random() * (CFG.noise.strobe.freqMax - CFG.noise.strobe.freqMin);
+                this.currentStrobePeriod = 1000 / freq;
+            }
+            const visibleTime = this.currentStrobePeriod * CFG.noise.strobe.dutyCycle;
+            this.isBlindPhase = this.strobeTimer > visibleTime;
+        } else {
+            this.isBlindPhase = false;
+        }
+    },
+
+    draw(ctx) {
+        const level = settings.noiseLevel;
+        if (level === 0) return;
+        
+        let alpha = 1.0;
+        if (level === 4) {
+            alpha = this.isBlindPhase ? CFG.noise.strobe.blindAlpha : CFG.noise.strobe.clearAlpha;
+        } else if (level === 3) {
+            alpha = 0.8;
+        } else if (level === 2) {
+            alpha = 0.5;
+        }
+        
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        if (level === 1) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            const dustCount = Math.min(this.w*this.h*0.0001, 200); 
+            for (let i=0; i<dustCount; i++) {
+                 const x = (Math.sin(i) * 10000) % this.w;
+                 const y = (Math.cos(i) * 10000) % this.h;
+                 ctx.fillRect(Math.abs(x), Math.abs(y), 1, 1);
+            }
+            ctx.restore();
+            return;
+        }
+
+        this.particles.forEach(p => {
+            if (p.isGabor) {
+                if (this.gaborCache) {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    if (!p.isHorizontal) ctx.rotate(p.angle);
+                    else ctx.rotate(Math.PI / 2); 
+                    
+                    const scale = (p.size * 2.4) / this.gaborCache.width; 
+                    ctx.scale(scale, scale);
+                    ctx.drawImage(this.gaborCache, -this.gaborCache.width/2, -this.gaborCache.height/2);
+                    ctx.restore();
+                }
+            } else if (p.isPixel) {
+                if (p.type < 0.33) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(0, 217, 255, 0.8)';
+                    ctx.fill();
+                } else if (p.type < 0.66) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 35, 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 50, 80, 0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
+                    ctx.fillRect(p.x, p.y, 2, 2);
+                }
+            }
+        });
+        
+        ctx.restore();
+    }
+};

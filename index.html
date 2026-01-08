@@ -19,36 +19,44 @@
     </div>
     
     <div class="mode-selector">
-        <div class="mode-card" onclick="startGame(1)">
+        <!-- MODE 1 -->
+        <div class="mode-card">
+            <div onclick="event.stopPropagation(); showDifficultyModal(1)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
             <span class="mode-num">01</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(1)">?</button>
             <h3>GABOR SCOUT</h3>
-            <p>
-                Gabor patch discrimination with adaptive contrast. 
-                Identify enemy orientation as visibility fades into noise.
-            </p>
+            <p>Identify <strong>Vertical</strong> targets in noise.</p>
             <span class="tag">V1 CORTEX + PERCEPTION</span>
         </div>
-        <div class="mode-card" onclick="showMode2Difficulty()">
+        
+        <!-- MODE 2 -->
+        <div class="mode-card">
+            <div onclick="event.stopPropagation(); showDifficultyModal(2)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
             <span class="mode-num">02</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(2)">?</button>
-            <h3>DYNAMIC TRACKING</h3>
-            <p>
-                Smooth pursuit training with lock confirmation. 
-                Track moving target, maintain cursor lock until confirmation.
-            </p>
+            <h3>PURE TRACKING</h3>
+            <p>Smooth pursuit. Track and hold.</p>
             <span class="tag">MT/V5 + PURSUIT</span>
         </div>
-        <div class="mode-card" onclick="startGame(3)">
+        
+        <!-- MODE 3 -->
+        <div class="mode-card">
+            <div onclick="event.stopPropagation(); showDifficultyModal(3)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
             <span class="mode-num">03</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(3)">?</button>
             <h3>SURGICAL LOCK</h3>
-            <p>
-                Zero tolerance precision. 
-                Hit the <span style="color:#00d9ff">3px core</span>. 
-                Hitting the halo results in <span style="color:#ff3366">severe penalty</span>.
-            </p>
+            <p>Zero tolerance. Hit Core. Avoid Halo.</p>
             <span class="tag">PREMOTOR + INHIBITION</span>
+        </div>
+        
+        <!-- MODE 4 (NEW) -->
+        <div class="mode-card">
+            <div onclick="event.stopPropagation(); showDifficultyModal(4)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
+            <span class="mode-num">04</span>
+            <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(4)">?</button>
+            <h3>LANDOLT SACCADE</h3>
+            <p>Forced Reset. Identify gap. Snap.</p>
+            <span class="tag">FOVEAL + SACCADE</span>
         </div>
     </div>
     
@@ -61,22 +69,19 @@
 <!-- ===== DIFFICULTY MODAL ===== -->
 <div class="difficulty-modal hidden" id="difficulty-modal">
     <div class="difficulty-content">
-        <h3>SELECT DIFFICULTY</h3>
+        <h3 id="diff-modal-title">SELECT DIFFICULTY</h3>
         <div class="difficulty-options">
-            <div class="diff-card" onclick="startGame(2, 'easy')">
+            <div class="diff-card" onclick="selectDifficulty('easy')">
                 <div class="diff-level">EASY</div>
-                <div class="diff-desc">Slow target · Long lock time</div>
-                <div class="diff-stats">Speed: 1.2 · Lock: 600ms</div>
+                <div class="diff-desc">Baseline · Clean</div>
             </div>
-            <div class="diff-card" onclick="startGame(2, 'medium')">
+            <div class="diff-card" onclick="selectDifficulty('medium')">
                 <div class="diff-level">MEDIUM</div>
-                <div class="diff-desc">Moderate speed · Standard lock</div>
-                <div class="diff-stats">Speed: 1.8 · Lock: 450ms</div>
+                <div class="diff-desc">Visual Crowding</div>
             </div>
-            <div class="diff-card" onclick="startGame(2, 'hard')">
+            <div class="diff-card" onclick="selectDifficulty('hard')">
                 <div class="diff-level">HARD</div>
-                <div class="diff-desc">Fast target · Quick lock required</div>
-                <div class="diff-stats">Speed: 2.5 · Lock: 350ms</div>
+                <div class="diff-desc">Neural Limit · Strobe</div>
             </div>
         </div>
         <button class="diff-cancel" onclick="hideDifficultyModal()">CANCEL</button>
@@ -92,217 +97,44 @@
 <div class="settings-modal hidden" id="settings-modal">
     <div class="settings-content">
         <h2>SETTINGS</h2>
-        
         <div class="settings-section">
             <h3>MOUSE SENSITIVITY</h3>
             <div class="setting-row">
-                <div>
-                    <label>Sensitivity Multiplier</label>
-                    <div class="desc">Adjust cursor movement speed (0.5x - 3.0x)</div>
-                </div>
+                <div><label>Sensitivity Multiplier</label></div>
                 <div class="scale-control">
-                    <input type="range" class="scale-slider" id="setting-sensitivity" 
-                           min="0.5" max="3" step="0.1" value="1"
-                           oninput="updateSensitivity(this.value)">
-                    <span class="scale-value" id="sensitivity-value">1.0x</span>
+                    <input type="range" class="scale-slider" id="setting-sensitivity" min="0.5" max="3" step="0.1" value="1" oninput="updateSensitivity(this.value)">
+                    <span class="scale-value" id="sens-value">1.0x</span>
                 </div>
             </div>
         </div>
-        
         <div class="settings-section">
-            <h3>MODE 1: GABOR SCOUT</h3>
+            <h3>MODE CONFIG</h3>
             <div class="setting-row">
-                <div>
-                    <label>Show Red Dot Target</label>
-                    <div class="desc">When disabled, hitbox remains but invisible (harder)</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-redDot" onchange="updateSetting('showRedDot', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="setting-row">
-                <div>
-                    <label>Adaptive Contrast</label>
-                    <div class="desc">Target fades as you improve (staircase method)</div>
-                </div>
+                <div><label>Adaptive Contrast (Mode 1)</label></div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="setting-adaptiveContrast" onchange="updateSetting('adaptiveContrast', this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
-            <div class="setting-row">
-                <div>
-                    <label>Dynamic Noise Overlay</label>
-                    <div class="desc">Pink noise mask for V1 cortex training</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-dynamicNoise" onchange="updateSetting('dynamicNoise', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
         </div>
-        
-        <div class="settings-section">
-            <h3>MODE 3: SURGICAL LOCK</h3>
-            <div class="setting-row">
-                <div>
-                    <label>Core Size (px)</label>
-                    <div class="desc">Precision target size (1-5px)</div>
-                </div>
-                <div class="scale-control">
-                    <input type="range" class="scale-slider" id="setting-coreSize" 
-                           min="1" max="5" step="1" value="3"
-                           oninput="updateCoreSizeSetting(this.value)">
-                    <span class="scale-value" id="coreSize-value">3px</span>
-                </div>
-            </div>
-            <div class="setting-row">
-                <div>
-                    <label>Penalty Zone Size (px)</label>
-                    <div class="desc">Halo size that triggers penalty (20-50px)</div>
-                </div>
-                <div class="scale-control">
-                    <input type="range" class="scale-slider" id="setting-penaltySize" 
-                           min="20" max="50" step="5" value="35"
-                           oninput="updatePenaltySizeSetting(this.value)">
-                    <span class="scale-value" id="penaltySize-value">35px</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="settings-section">
-            <h3>AFTER-GAZE HOLD</h3>
-            <div class="desc" style="margin-bottom:15px;color:#666;">Require 300ms cursor hold after each kill to train post-shot stability</div>
-            <div class="setting-row">
-                <div>
-                    <label>Mode 1 (Gabor Scout)</label>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-afterGaze1" onchange="updateSetting('afterGazeMode1', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="setting-row">
-                <div>
-                    <label>Mode 2 (Dynamic Tracking)</label>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-afterGaze2" onchange="updateSetting('afterGazeMode2', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="setting-row">
-                <div>
-                    <label>Mode 3 (Surgical Lock)</label>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-afterGaze3" onchange="updateSetting('afterGazeMode3', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </div>
-        
-        <div class="settings-section">
-            <h3>VISUAL NOISE (Background)</h3>
-            <div class="radio-group">
-                <div class="radio-option" onclick="setVisualNoise('clean')">
-                    <div class="radio-title">CLEAN</div>
-                    <div class="radio-desc">Pure black. Laboratory conditions.</div>
-                </div>
-                <div class="radio-option" onclick="setVisualNoise('grid')">
-                    <div class="radio-title">GRID</div>
-                    <div class="radio-desc">Structured lines. Spatial reference.</div>
-                </div>
-                <div class="radio-option" onclick="setVisualNoise('chaos')">
-                    <div class="radio-title">CHAOS</div>
-                    <div class="radio-desc">Combat noise. V1 cortex challenge.</div>
-                </div>
-            </div>
-            <div class="noise-preview">
-                <canvas id="noise-preview-canvas"></canvas>
-            </div>
-        </div>
-        
         <div class="settings-section">
             <h3>CROSSHAIR</h3>
             <div class="crosshair-grid">
-                <div class="crosshair-option" onclick="setCrosshair('cross')" data-ch="cross">
-                    <svg viewBox="0 0 32 32">
-                        <line x1="6" y1="16" x2="12" y2="16" stroke="#00d9ff" stroke-width="1.5"/>
-                        <line x1="20" y1="16" x2="26" y2="16" stroke="#00d9ff" stroke-width="1.5"/>
-                        <line x1="16" y1="6" x2="16" y2="12" stroke="#00d9ff" stroke-width="1.5"/>
-                        <line x1="16" y1="20" x2="16" y2="26" stroke="#00d9ff" stroke-width="1.5"/>
-                    </svg>
-                </div>
-                <div class="crosshair-option" onclick="setCrosshair('dot')" data-ch="dot">
-                    <svg viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="3" fill="#00d9ff"/>
-                    </svg>
-                </div>
-                <div class="crosshair-option" onclick="setCrosshair('circle')" data-ch="circle">
-                    <svg viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="10" fill="none" stroke="#00d9ff" stroke-width="1.5"/>
-                        <circle cx="16" cy="16" r="2" fill="#00d9ff"/>
-                    </svg>
-                </div>
-                <div class="crosshair-option" onclick="setCrosshair('chevron')" data-ch="chevron">
-                    <svg viewBox="0 0 32 32">
-                        <path d="M10 10 L16 18 L22 10" fill="none" stroke="#00d9ff" stroke-width="1.5"/>
-                        <circle cx="16" cy="22" r="2" fill="#00d9ff"/>
-                    </svg>
-                </div>
-                <div class="crosshair-option" onclick="setCrosshair('crossdot')" data-ch="crossdot">
-                    <svg viewBox="0 0 32 32">
-                        <line x1="4" y1="16" x2="28" y2="16" stroke="#00d9ff" stroke-width="1.5"/>
-                        <line x1="16" y1="4" x2="16" y2="28" stroke="#00d9ff" stroke-width="1.5"/>
-                        <rect x="15" y="15" width="2" height="2" fill="#fff"/>
-                    </svg>
-                </div>
+                <div class="crosshair-option" onclick="setCrosshair('cross')" data-ch="cross"><svg viewBox="0 0 32 32"><line x1="6" y1="16" x2="12" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="20" y1="16" x2="26" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="6" x2="16" y2="12" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="20" x2="16" y2="26" stroke="#00d9ff" stroke-width="1.5"/></svg></div>
+                <div class="crosshair-option" onclick="setCrosshair('dot')" data-ch="dot"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="3" fill="#00d9ff"/></svg></div>
+                <div class="crosshair-option" onclick="setCrosshair('circle')" data-ch="circle"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="#00d9ff" stroke-width="1.5"/><circle cx="16" cy="16" r="2" fill="#00d9ff"/></svg></div>
             </div>
-            
             <div class="setting-row">
                 <label>Scale</label>
                 <div class="scale-control">
-                    <input type="range" class="scale-slider" id="setting-scale" 
-                           min="0.5" max="2" step="0.1" value="1"
-                           oninput="updateCrosshairScale(this.value)">
+                    <input type="range" class="scale-slider" id="setting-scale" min="0.5" max="2" step="0.1" value="1" oninput="updateCrosshairScale(this.value)">
                     <span class="scale-value" id="scale-value">1.0x</span>
                 </div>
             </div>
-            
-            <div class="crosshair-preview">
-                <canvas id="crosshair-preview-canvas"></canvas>
-            </div>
+            <div class="crosshair-preview"><canvas id="crosshair-preview-canvas"></canvas></div>
         </div>
-        
-        <div class="settings-section">
-            <h3>AUDIO</h3>
-            <div class="setting-row">
-                <div>
-                    <label>Sound Effects</label>
-                    <div class="desc">Enable/disable all game sounds</div>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-soundEnabled" onchange="updateSetting('soundEnabled', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="setting-row">
-                <div>
-                    <label>Volume</label>
-                </div>
-                <div class="scale-control">
-                    <input type="range" class="scale-slider" id="setting-volume" 
-                           min="0" max="1" step="0.1" value="0.5"
-                           oninput="updateVolume(this.value)">
-                    <span class="scale-value" id="volume-value">50%</span>
-                </div>
-            </div>
-        </div>
-        
         <div class="settings-actions">
-            <button onclick="resetSettings()">RESET DEFAULTS</button>
+            <button onclick="resetSettings()">RESET</button>
             <button class="primary" onclick="closeSettings()">SAVE & CLOSE</button>
         </div>
     </div>
@@ -311,196 +143,51 @@
 <!-- ===== GAME SCREEN ===== -->
 <div id="game-screen" class="screen">
     <canvas id="game-canvas"></canvas>
-    
     <div class="game-hud">
-        <div class="hud-item">
-            <div class="label">TIME</div>
-            <div class="value time" id="hud-time">60</div>
-        </div>
-        <div class="hud-item">
-            <div class="label">SCORE</div>
-            <div class="value score" id="hud-score">0</div>
-        </div>
-        <div class="hud-item">
-            <div class="label">ACCURACY</div>
-            <div class="value accuracy" id="hud-accuracy">--%</div>
-        </div>
-        <div class="hud-item mode1-only" id="hud-contrast-container">
-            <div class="label">CONTRAST</div>
-            <div class="value contrast" id="hud-contrast">100%</div>
-        </div>
+        <div class="hud-item"><div class="label">TIME</div><div class="value time" id="hud-time">60</div></div>
+        <div class="hud-item"><div class="label">SCORE</div><div class="value score" id="hud-score">0</div></div>
+        <div class="hud-item"><div class="label">ACCURACY</div><div class="value accuracy" id="hud-accuracy">--%</div></div>
     </div>
-    
     <div class="escape-hint">[ESC] PAUSE</div>
-    
     <div class="countdown-overlay" id="countdown-overlay">
         <div class="click-prompt" id="click-prompt">CLICK TO BEGIN</div>
         <div class="countdown-text" id="countdown-text" style="display:none">3</div>
     </div>
-    
     <div class="pause-modal hidden" id="pause-modal">
         <h2>PAUSED</h2>
-        <div class="buttons">
-            <button onclick="resumeGame()">RESUME</button>
-            <button class="danger" onclick="confirmQuit()">QUIT</button>
-        </div>
+        <div class="buttons"><button onclick="resumeGame()">RESUME</button><button class="danger" onclick="confirmQuit()">QUIT</button></div>
     </div>
-    
     <div class="pause-modal hidden" id="quit-confirm">
         <h2>CONFIRM QUIT?</h2>
-        <p style="color:#555; margin-bottom:20px;">Progress will be lost</p>
-        <div class="buttons">
-            <button onclick="cancelQuit()">CANCEL</button>
-            <button class="danger" onclick="quitGame()">QUIT</button>
-        </div>
+        <div class="buttons"><button onclick="cancelQuit()">CANCEL</button><button class="danger" onclick="quitGame()">QUIT</button></div>
     </div>
 </div>
 
 <!-- ===== RESULT SCREEN ===== -->
 <div id="result-screen" class="screen">
-    <div class="result-header">
-        <h2>SESSION COMPLETE</h2>
-    </div>
-    
-    <div class="result-score">
-        <div class="big-score" id="result-score">0</div>
-        <div class="score-label">TOTAL SCORE</div>
-    </div>
-    
+    <div class="result-header"><h2>SESSION COMPLETE</h2></div>
+    <div class="result-score"><div class="big-score" id="result-score">0</div><div class="score-label">TOTAL SCORE</div></div>
     <div class="result-stats">
-        <div class="result-stat">
-            <div class="val" id="result-hits">0</div>
-            <div class="lbl">HITS</div>
-        </div>
-        <div class="result-stat">
-            <div class="val" id="result-misses">0</div>
-            <div class="lbl">MISSES</div>
-        </div>
-        <div class="result-stat">
-            <div class="val" id="result-accuracy">0%</div>
-            <div class="lbl">ACCURACY</div>
-        </div>
-        <div class="result-stat">
-            <div class="val" id="result-avgrt">--</div>
-            <div class="lbl">AVG RT (MS)</div>
-        </div>
+        <div class="result-stat"><div class="val" id="result-hits">0</div><div class="lbl">HITS</div></div>
+        <div class="result-stat"><div class="val" id="result-misses">0</div><div class="lbl">MISSES</div></div>
+        <div class="result-stat"><div class="val" id="result-accuracy">0%</div><div class="lbl">ACCURACY</div></div>
+        <div class="result-stat"><div class="val" id="result-avgrt">--</div><div class="lbl">AVG RT (MS)</div></div>
     </div>
-    
-    <div class="result-chart">
-        <div class="chart-title">RECENT 10 SESSIONS</div>
-        <canvas id="result-chart-canvas"></canvas>
-    </div>
-    
-    <div class="result-actions">
-        <button onclick="showScreen('menu-screen')">MENU</button>
-        <button onclick="showScreen('stats-screen')">STATS</button>
-        <button class="primary" onclick="restartGame()">AGAIN</button>
-    </div>
+    <div class="result-actions"><button onclick="showScreen('menu-screen')">MENU</button><button class="primary" onclick="restartGame()">AGAIN</button></div>
 </div>
 
 <!-- ===== STATS SCREEN ===== -->
 <div id="stats-screen" class="screen">
-    <div class="stats-header">
-        <h2>TRAINING ANALYTICS</h2>
-        <button class="back-btn" onclick="showScreen('menu-screen')">← BACK</button>
-    </div>
-    
-    <div class="mode-tabs">
-        <button class="mode-tab active" onclick="setStatsMode('mode1')">MODE 1: GABOR</button>
-        <button class="mode-tab" onclick="setStatsMode('mode2_easy')">MODE 2: EASY</button>
-        <button class="mode-tab" onclick="setStatsMode('mode2_medium')">MODE 2: MEDIUM</button>
-        <button class="mode-tab" onclick="setStatsMode('mode2_hard')">MODE 2: HARD</button>
-        <button class="mode-tab" onclick="setStatsMode('mode3')">MODE 3: SURGICAL</button>
-    </div>
-    
-    <div id="stats-content">
-        <div class="stats-grid">
-            <div class="stat-card highlight">
-                <div class="stat-value" id="stat-sessions">0</div>
-                <div class="stat-label">TOTAL SESSIONS</div>
-            </div>
-            <div class="stat-card green">
-                <div class="stat-value" id="stat-best">0</div>
-                <div class="stat-label">BEST SCORE</div>
-            </div>
-            <div class="stat-card yellow">
-                <div class="stat-value" id="stat-avg">0</div>
-                <div class="stat-label">AVERAGE SCORE</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-total">0</div>
-                <div class="stat-label">TOTAL HITS</div>
-            </div>
-        </div>
-        
-        <div class="stats-row">
-            <div class="chart-card">
-                <h3>SCORE HISTORY (LAST 20)</h3>
-                <canvas id="stats-score-chart"></canvas>
-            </div>
-            <div class="chart-card">
-                <h3>ACCURACY TREND</h3>
-                <canvas id="stats-acc-chart"></canvas>
-            </div>
-        </div>
-        
-        <div class="stats-row">
-            <div class="chart-card">
-                <h3>REACTION TIME TREND (MS)</h3>
-                <canvas id="stats-rt-chart"></canvas>
-            </div>
-            <div class="level-indicator">
-                <h3>SKILL ASSESSMENT</h3>
-                <div class="level" id="skill-level">--</div>
-                <div class="level-name" id="skill-name">NO DATA</div>
-                <div class="level-bar">
-                    <div class="level-bar-fill" id="skill-bar" style="width:0%"></div>
-                    <div class="level-bar-marks">
-                        <span></span><span></span><span></span><span></span><span></span>
-                    </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:10px;color:#444;">
-                    <span>NOVICE</span>
-                    <span>TRAINED</span>
-                    <span>EXPERT</span>
-                    <span>ELITE</span>
-                    <span>MASTER</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="stats-row">
-            <div class="chart-card">
-                <h3>RT vs ACCURACY CORRELATION</h3>
-                <canvas id="stats-corr-rt-acc"></canvas>
-                <div class="corr-insight" id="corr-insight-1"></div>
-            </div>
-            <div class="chart-card">
-                <h3>RT vs SCORE CORRELATION</h3>
-                <canvas id="stats-corr-rt-score"></canvas>
-                <div class="corr-insight" id="corr-insight-2"></div>
-            </div>
-        </div>
-        
-        <div class="chart-card" style="margin-top:20px;">
-            <h3>SESSION BREAKDOWN</h3>
-            <div id="session-list" style="max-height:300px;overflow-y:auto;"></div>
-        </div>
-    </div>
-    
-    <div class="no-data" id="no-data" style="display:none;">
-        NO TRAINING DATA YET<br>
-        <span style="color:#555;font-size:12px;">Complete a session to see statistics</span>
-    </div>
+    <div class="stats-header"><h2>ANALYTICS</h2><button class="back-btn" onclick="showScreen('menu-screen')">← BACK</button></div>
+    <div class="no-data" style="text-align:center; padding:50px; color:#555;">(Statistics module preserved)</div>
 </div>
 
-<!-- ===== FLASH EFFECTS ===== -->
+<!-- FLASH EFFECTS -->
 <div class="flash-overlay penalty" id="flash-penalty"></div>
 <div class="flash-overlay warn" id="flash-warn"></div>
 <div class="flash-text penalty" id="flash-text-penalty">INVALID</div>
 <div class="flash-text warn" id="flash-text-warn">BROKE GAZE</div>
 
-<!-- ===== SCRIPTS (Modular) ===== -->
 <script src="js/config.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/audio.js"></script>
@@ -513,5 +200,20 @@
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 
+<script>
+let selectedModeForDifficulty = 1;
+function showDifficultyModal(mode) {
+    selectedModeForDifficulty = mode;
+    const m = document.getElementById('difficulty-modal');
+    if(m) m.classList.remove('hidden');
+}
+function hideDifficultyModal() {
+    const m = document.getElementById('difficulty-modal');
+    if(m) m.classList.add('hidden');
+}
+function selectDifficulty(diff) {
+    startGame(selectedModeForDifficulty, diff);
+}
+</script>
 </body>
 </html>

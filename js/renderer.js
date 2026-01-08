@@ -1,130 +1,119 @@
 // ==================== RENDERER ====================
 // All canvas drawing functions
 
-// Draw background based on settings
 function drawBackground(ctx, width, height) {
-    if (settings.visualNoise === 'chaos') {
-        if (!chaosNoiseGenerated) {
-            generateChaosNoise(width, height);
-        }
-        ctx.drawImage(chaosNoiseCanvas, 0, 0);
-    } else if (settings.visualNoise === 'clean') {
-        ctx.fillStyle = '#0a0a0f';
-        ctx.fillRect(0, 0, width, height);
-    } else if (settings.visualNoise === 'grid') {
-        ctx.fillStyle = '#0a0a0f';
-        ctx.fillRect(0, 0, width, height);
-        ctx.strokeStyle = '#0f0f18';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let i = 0; i < width; i += 80) {
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, height);
-        }
-        for (let i = 0; i < height; i += 80) {
-            ctx.moveTo(0, i);
-            ctx.lineTo(width, i);
-        }
-        ctx.stroke();
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, width, height);
+}
+
+function drawNoiseLayer(ctx) {
+    if (typeof NoiseSystem !== 'undefined') {
+        NoiseSystem.draw(ctx);
     }
 }
 
-// Draw Mode 1: Gabor target with adaptive contrast
-function drawGaborTarget(ctx) {
-    const x = target.x, y = target.y, size = CFG.gaborSize;
-    
+// SHARED GABOR RENDERER
+function drawGaborStruct(ctx, x, y, size, isVertical, opacity) {
+    if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
+
+    const safeOpacity = Math.max(opacity, 0.1); 
     ctx.save();
+    ctx.globalAlpha = safeOpacity;
     
-    // Apply adaptive contrast if enabled
-    if (settings.adaptiveContrast) {
-        ctx.globalAlpha = target.contrast;
-    }
-    
+    const baseColor = '150, 150, 150'; 
+
     ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
-    ctx.clip();
-    
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x - size, y - size, size * 2, size * 2);
-    
-    // Draw Gabor stripes
-    ctx.strokeStyle = '#ccc';
+    ctx.strokeStyle = `rgb(${baseColor})`; 
     ctx.lineWidth = 3;
-    const step = 8;
-    const isVertical = target.type === 0;  // Enemy = vertical
+    const step = 6;
+    const drawSize = size * 1.2; 
     
-    for (let i = -size; i < size; i += step) {
+    for (let i = -drawSize; i < drawSize; i += step) {
         ctx.beginPath();
         if (isVertical) {
-            ctx.moveTo(x + i, y - size);
-            ctx.lineTo(x + i, y + size);
+            ctx.moveTo(x + i, y - drawSize);
+            ctx.lineTo(x + i, y + drawSize);
         } else {
-            ctx.moveTo(x - size, y + i);
-            ctx.lineTo(x + size, y + i);
+            ctx.moveTo(x - drawSize, y + i);
+            ctx.lineTo(x + drawSize, y + i);
         }
         ctx.stroke();
     }
     
-    // Gaussian envelope
-    const g = ctx.createRadialGradient(x, y, 0, x, y, size);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0.6)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    
     ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = g;
-    ctx.fillRect(x - size, y - size, size * 2, size * 2);
-    ctx.restore();
+    const g = ctx.createRadialGradient(x, y, 0, x, y, size);
+    g.addColorStop(0, 'rgba(0, 0, 0, 1)');
+    g.addColorStop(0.5, 'rgba(0, 0, 0, 0.8)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
     
-    // Draw red dot center (if enabled)
-    if (settings.showRedDot) {
-        ctx.beginPath();
-        ctx.arc(x, y, CFG.microDotSize, 0, Math.PI * 2);
-        ctx.fillStyle = '#ff3366';
-        ctx.shadowColor = '#ff3366';
-        ctx.shadowBlur = 10;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
+    ctx.fillStyle = g;
+    ctx.fillRect(x - drawSize, y - drawSize, drawSize * 2, drawSize * 2);
+    ctx.globalCompositeOperation = 'source-over';
+    
+    ctx.restore();
 }
 
-// Draw Mode 2: Tracking target with lock ring
+// Mode 1: Gabor Target
+function drawGaborTarget(ctx) {
+    const t = window.target;
+    if(!t) return;
+    let contrast = 1.0;
+    if (settings.adaptiveContrast) contrast = t.contrast;
+    drawGaborStruct(ctx, t.x, t.y, CFG.gaborSize, t.type === 0, contrast);
+}
+
+// Mode 2: PURE TRACKING TARGET
 function drawTrackingTarget(ctx) {
-    const x = target.x, y = target.y;
-    const p = target.trackProgress;
-    const color = p >= 1 ? '#00ff99' : '#ffcc00';
+    const t = window.target;
+    if(!t) return;
     
-    // Background ring
+    const x = t.x, y = t.y;
+    const size = CFG.tracking.targetSize;
+    const color = t.isLocked ? '#00ff99' : '#00d9ff';
+    
+    ctx.save();
+    ctx.shadowBlur = t.isLocked ? 20 : 10;
+    ctx.shadowColor = color;
+    
     ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 4;
+    ctx.arc(x, y, size * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.shadowBlur = 0; 
+    
+    const p = t.trackProgress; 
+    const lockThresh = CFG.tracking.lockThreshold;
+    const pct = Math.min(1, p / lockThresh);
+    
+    // Outer static ring
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 2;
     ctx.stroke();
     
     // Progress ring
-    ctx.beginPath();
-    ctx.arc(x, y, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
-    ctx.stroke();
+    if (pct > 0) {
+        ctx.beginPath();
+        ctx.arc(x, y, size, -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * pct));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
     
-    // Center dot
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = p >= 1 ? 20 : 5;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.restore();
 }
 
-// Draw Mode 3: Surgical precision target
+// Mode 3: Surgical Target
 function drawSurgicalTarget(ctx) {
-    const x = target.x, y = target.y;
+    const t = window.target;
+    if(!t) return;
+    if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
+
+    const x = t.x, y = t.y;
     const coreSize = CFG.surgical.coreSize;
     const penaltySize = CFG.surgical.penaltySize;
     
-    // Draw penalty halo (red zone)
     ctx.beginPath();
     ctx.arc(x, y, penaltySize, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 50, 80, 0.12)';
@@ -133,14 +122,6 @@ function drawSurgicalTarget(ctx) {
     ctx.fill();
     ctx.stroke();
     
-    // Inner warning ring
-    ctx.beginPath();
-    ctx.arc(x, y, penaltySize * 0.6, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 50, 80, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    // Draw core target (cyan)
     ctx.beginPath();
     ctx.arc(x, y, coreSize, 0, Math.PI * 2);
     ctx.fillStyle = '#00d9ff';
@@ -148,18 +129,77 @@ function drawSurgicalTarget(ctx) {
     ctx.shadowBlur = 15;
     ctx.fill();
     ctx.shadowBlur = 0;
-    
-    // Tiny dot in center for extra precision reference
-    ctx.beginPath();
-    ctx.arc(x, y, 1, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
 }
 
-// Draw after-gaze hold indicator
+// Mode 4: Landolt C
+function drawLandoltTarget(ctx) {
+    const t = window.target;
+    if(!t) return;
+
+    if (t.isResetPoint) {
+        // Draw Center Reset Indicator
+        const cx = window.canvasWidth / 2;
+        const cy = window.canvasHeight / 2;
+        
+        ctx.save();
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#00d9ff'; 
+        ctx.shadowColor = '#00d9ff';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Pulse ring
+        const pulse = (performance.now() % 1000) / 1000;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 20 + pulse * 10, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 217, 255, ${1 - pulse})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        ctx.font = '12px JetBrains Mono';
+        ctx.fillStyle = '#00d9ff';
+        ctx.textAlign = 'center';
+        ctx.fillText("RESET", cx, cy + 40);
+        ctx.restore();
+        return;
+    }
+
+    // Actual Target
+    const { x, y, size, gapDir, contrast } = t;
+    
+    ctx.save();
+    ctx.globalAlpha = contrast;
+    
+    const color = '#00d9ff'; 
+    ctx.strokeStyle = color;
+    ctx.lineWidth = size * 0.25; 
+    
+    const gapSize = Math.PI / 3; 
+    let startAngle = 0;
+    let endAngle = 0;
+    
+    // gapDir: 0:Right, 1:Down, 2:Left, 3:Up
+    const offset = gapDir * (Math.PI / 2);
+    startAngle = offset + gapSize / 2;
+    endAngle = offset + (Math.PI * 2) - gapSize / 2;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, size/2, startAngle, endAngle);
+    ctx.stroke();
+    
+    ctx.restore();
+}
+
+
 function drawAfterGaze(ctx) {
-    const progress = (performance.now() - target.deadTime) / CFG.afterGazeTime;
-    const x = target.deadX, y = target.deadY;
+    const t = window.target;
+    if(!t) return;
+    
+    const progress = (performance.now() - t.deadTime) / CFG.afterGazeTime;
+    const x = t.deadX, y = t.deadY;
     const radius = 40 * (1 - progress * 0.5);
     
     ctx.beginPath();
@@ -167,33 +207,21 @@ function drawAfterGaze(ctx) {
     ctx.strokeStyle = 'rgba(0,217,255,' + (0.8 - progress * 0.5) + ')';
     ctx.lineWidth = 2;
     ctx.stroke();
-    
-    // Progress arc
-    ctx.beginPath();
-    ctx.arc(x, y, radius + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-    ctx.strokeStyle = '#00ff99';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    
-    ctx.font = '10px Orbitron';
-    ctx.fillStyle = 'rgba(0,217,255,0.6)';
-    ctx.textAlign = 'center';
-    ctx.fillText('HOLD', x, y - 55);
 }
 
-// Draw crosshair at current mouse position
 function drawCrosshair(ctx, mx, my) {
     drawCrosshairAt(ctx, mx, my, settings.crosshair, settings.crosshairScale);
 }
 
-// Draw crosshair at specific position (used for preview too)
 function drawCrosshairAt(ctx, x, y, type, scale) {
-    const color = '#00d9ff';
-    
+    const color = '#00d9ff'; 
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = 1.5;
     
+    // Default fallback
+    if (x === undefined || y === undefined) return;
+
     switch (type) {
         case 'cross': {
             const len = 10 * scale;

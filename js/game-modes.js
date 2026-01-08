@@ -1,234 +1,288 @@
 // ==================== GAME MODES ====================
-// Mode-specific click handlers and logic
+// Mode-specific logic and click handlers
 
-// Mode 1: Gabor Scout - Visual discrimination with adaptive contrast
-function handleMode1Click(dist) {
-    playSound('click');
+// Helper: Movement update
+function updateMovement(obj, dt, speedMultiplier = 1.0) {
+    if (!obj.vx) return; 
+
+    obj.x += obj.vx * speedMultiplier;
+    obj.y += obj.vy * speedMultiplier;
+
+    const margin = 50;
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
     
-    const coreHit = dist <= CFG.microDotSize + 2;
-    const bodyHit = dist <= CFG.gaborSize;
+    if (obj.x < margin || obj.x > w - margin) obj.vx *= -1;
+    if (obj.y < margin || obj.y > h - margin) obj.vy *= -1;
+
+    if (!obj.changeDirTimer) obj.changeDirTimer = 2000 + Math.random() * 1000;
+    obj.changeDirTimer -= dt;
     
-    if (coreHit) {
-        if (target.type === 0) {  // Enemy (vertical stripes)
-            playSound('hit');
-            const rt = performance.now() - target.spawnTime;
-            reactionTimes.push(rt);
-            
-            // Adaptive contrast: make next target harder
-            if (settings.adaptiveContrast) {
-                target.contrast = Math.max(
-                    CFG.gabor.minContrast,
-                    target.contrast - CFG.gabor.stepDown
-                );
-            }
-            
-            initiateAfterGaze(1);
-        } else {  // Friendly (horizontal stripes)
-            playSound('error');
-            score -= 3;
-            misses++;
-            
-            // Adaptive contrast: make next target easier
-            if (settings.adaptiveContrast) {
-                target.contrast = Math.min(1.0, target.contrast + CFG.gabor.stepUp);
-            }
-            
-            triggerPenalty('FRIENDLY FIRE', 'hit');
-        }
-    } else if (bodyHit) {
-        if (target.type === 0) {  // Enemy body hit but missed core
-            playSound('miss');
-            score -= 1;
-            misses++;
-            
-            if (settings.adaptiveContrast) {
-                target.contrast = Math.min(1.0, target.contrast + CFG.gabor.stepUp * 0.5);
-            }
-            
-            showFeedback('MISSED CORE', 'warn');
-            spawnTarget();
-        } else {  // Friendly
-            playSound('error');
-            score -= 2;
-            misses++;
-            
-            if (settings.adaptiveContrast) {
-                target.contrast = Math.min(1.0, target.contrast + CFG.gabor.stepUp);
-            }
-            
-            triggerPenalty('FRIENDLY FIRE', 'miss');
-        }
+    if (obj.changeDirTimer <= 0) {
+        const speed = Math.sqrt(obj.vx*obj.vx + obj.vy*obj.vy);
+        const currentAngle = Math.atan2(obj.vy, obj.vx);
+        const newAngle = currentAngle + (Math.random() - 0.5) * Math.PI; 
+        
+        obj.vx = Math.cos(newAngle) * speed;
+        obj.vy = Math.sin(newAngle) * speed;
+        
+        obj.changeDirTimer = 2000 + Math.random() * 1000; 
     }
-    // Miss entirely = no penalty, just didn't click on target
 }
 
-// Mode 2: Dynamic Tracking - Smooth pursuit with lock
-function handleMode2Click(dist) {
-    playSound('click');
+// ===== MODE 1: GABOR SCOUT =====
+function spawnTarget() {
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
+    const margin = 100;
+    const x = margin + Math.random() * (w - margin * 2);
+    const y = margin + Math.random() * (h - margin * 2);
     
-    if (dist < 35 && target.trackProgress >= 1) {
-        // Locked and on target
-        playSound('hit');
-        const rt = performance.now() - target.spawnTime;
-        reactionTimes.push(rt);
-        initiateAfterGaze(2);
-    } else if (dist < 35) {
-        // On target but not locked yet
-        playSound('error');
-        score -= 2;
+    const baseSpeed = CFG.noise.baseSpeed; 
+    
+    window.target = {
+        x: x, y: y,
+        vx: (Math.random() - 0.5) * baseSpeed,
+        vy: (Math.random() - 0.5) * baseSpeed,
+        changeDirTimer: Math.random() * 2000,
+        type: 0, // Vertical
+        spawnTime: performance.now(),
+        contrast: CFG.gabor.startContrast,
+        deadTime: 0
+    };
+}
+
+function updateMode1(timestamp, dt) {
+    const t = window.target;
+    if(!t) return;
+    
+    const age = timestamp - t.spawnTime;
+    const limit = CFG.enemyTimeout;
+    
+    let speedScale = 1.0;
+    if (currentDifficulty === 'medium' || currentDifficulty === 'hard') {
+        speedScale = 1.6; 
+    }
+    
+    updateMovement(t, dt / 16.67, speedScale);
+
+    if (age > limit && !t.deadTime) {
         misses++;
-        triggerPenalty('WAIT FOR LOCK');
+        flashEffect('warn', 'MISSED');
+        playSound('miss');
+        CFG.gabor.startContrast = Math.min(1.0, CFG.gabor.startContrast + CFG.gabor.stepUp);
+        spawnTarget();
     }
-    // Click outside target = ignored
 }
 
-// Mode 3: Surgical Lock - Extreme precision
+function handleMode1Click(dist) {
+    const t = window.target;
+    if (dist <= CFG.gaborSize) {
+        if (t.type === 0) {
+            score += 100;
+            hits++;
+            playSound('hit');
+            reactionTimes.push(performance.now() - t.spawnTime);
+            
+            if (settings.adaptiveContrast) {
+                const nextContrast = CFG.gabor.startContrast - CFG.gabor.stepDown;
+                CFG.gabor.startContrast = Math.max(0.08, nextContrast);
+            }
+            spawnTarget();
+        } 
+    }
+}
+
+// ===== MODE 2: PURE TRACKING =====
+function initMode2Target() {
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
+    const margin = 100;
+    const x = margin + Math.random() * (w - margin * 2);
+    const y = margin + Math.random() * (h - margin * 2);
+    const speed = CFG.mode2[currentDifficulty] || 6;
+    
+    window.target = {
+        x: x, y: y,
+        vx: (Math.random() - 0.5) * speed,
+        vy: (Math.random() - 0.5) * speed,
+        changeDirTimer: Math.random() * 3000,
+        trackProgress: 0,
+        isLocked: false 
+    };
+}
+
+function updateMode2(timestamp, dt) {
+    const t = window.target;
+    if (!t) { initMode2Target(); return; }
+    if (!t.vx) initMode2Target();
+    
+    updateMovement(t, dt / 16.67);
+    
+    // Logic Fix: Ensure mouse coords are valid
+    const dx = window.mouseX - t.x;
+    const dy = window.mouseY - t.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    
+    // Tracking radius = target size + margin
+    const radius = CFG.tracking.targetSize + 15; 
+    
+    if (dist <= radius) {
+        // Gain Lock
+        t.trackProgress += dt / 1000; 
+        if (t.trackProgress >= CFG.tracking.lockThreshold) {
+            t.trackProgress = CFG.tracking.lockThreshold;
+            t.isLocked = true; 
+        }
+    } else {
+        // Decay Lock
+        t.trackProgress = Math.max(0, t.trackProgress - (dt / 500));
+        if (t.trackProgress < CFG.tracking.lockThreshold) {
+            t.isLocked = false;
+        }
+    }
+}
+
+function handleMode2Click(dist) {
+    const t = window.target;
+    // Must be locked (Green) to kill
+    if (t.isLocked) {
+        score += 200;
+        hits++;
+        playSound('hit');
+        flashEffect('hit', 'ELIMINATED');
+        startAfterGaze();
+    } else {
+        // Clicked while tracking but not locked? 
+        // Maybe feedback?
+    }
+}
+
+// ===== MODE 3: SURGICAL LOCK =====
+function updateMode3(timestamp, dt) { /* Static target */ }
+
 function handleMode3Click(dist) {
-    playSound('click');
-    
-    const coreSize = CFG.surgical.coreSize;
-    const penaltySize = CFG.surgical.penaltySize;
-    
-    // Core hit (with 2px tolerance)
-    const coreHit = dist <= coreSize + 2;
-    // Penalty zone hit
-    const penaltyHit = dist <= penaltySize;
-    
-    if (coreHit) {
-        // Perfect precision hit!
-        playSound('precision');
+    if (dist <= CFG.surgical.coreSize + 2) {
         score += CFG.surgical.coreScore;
         hits++;
-        
-        const rt = performance.now() - target.spawnTime;
-        reactionTimes.push(rt);
-        
-        initiateAfterGaze(3);
-    } else if (penaltyHit) {
-        // Hit the penalty halo - severe punishment
-        playSound('penalty');
-        score += CFG.surgical.penaltyScore;  // Negative
-        misses++;
-        
-        triggerPenalty('PRECISION FAIL');
-        // Important: Do NOT spawn new target - force retry
+        playSound('headshot');
+        spawnTarget(); 
+    } else if (dist <= CFG.surgical.penaltySize) {
+        score += CFG.surgical.penaltyScore;
+        flashEffect('penalty', 'IMPURE');
+        playSound('error');
     } else {
-        // Missed entirely
-        playSound('miss');
-        score += CFG.surgical.missScore;  // Small negative
-        misses++;
+        score += CFG.surgical.missScore;
     }
 }
 
-// Initiate after-gaze hold if enabled for current mode
-function initiateAfterGaze(mode) {
-    let shouldHold = false;
-    
-    if (mode === 1 && settings.afterGazeMode1) shouldHold = true;
-    else if (mode === 2 && settings.afterGazeMode2) shouldHold = true;
-    else if (mode === 3 && settings.afterGazeMode3) shouldHold = true;
-    
-    if (shouldHold) {
-        target.afterGazeActive = true;
-        target.deadX = target.x;
-        target.deadY = target.y;
-        target.deadTime = performance.now();
-    } else {
-        completeKill();
-    }
+// ===== MODE 4: LANDOLT SACCADE =====
+let mode4State = 'reset';
+
+function initMode4() {
+    mode4State = 'reset';
+    window.target = { 
+        x: window.canvasWidth / 2, 
+        y: window.canvasHeight / 2,
+        isResetPoint: true 
+    };
 }
 
-// Complete kill and spawn new target
-function completeKill() {
-    score++;
-    hits++;
-    target.afterGazeActive = false;
-    spawnTarget();
-    updateHUD();
+function spawnMode4Target() {
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
+    const margin = 100;
+    const x = margin + Math.random() * (w - margin * 2);
+    const y = margin + Math.random() * (h - margin * 2);
+    
+    const gapDir = Math.floor(Math.random() * 4);
+    const conf = CFG.landolt[currentDifficulty];
+    
+    window.target = {
+        x: x, y: y,
+        gapDir: gapDir,
+        size: conf.size,
+        contrast: conf.contrast,
+        spawnTime: performance.now(),
+        timeout: conf.timeout,
+        isResetPoint: false
+    };
+    mode4State = 'target';
 }
 
-// Spawn a new target based on current mode
-function spawnTarget() {
-    const pad = 120;
-    target.x = pad + Math.random() * (canvasWidth - pad * 2);
-    target.y = pad + Math.random() * (canvasHeight - pad * 2);
-    target.spawnTime = performance.now();
-    target.trackProgress = 0;
-    target.afterGazeActive = false;
-    
-    if (currentMode === 1) {
-        // Mode 1: Friend/Enemy with adaptive ratio
-        targetHistory.push(0);
-        if (targetHistory.length > 20) targetHistory.shift();
+function updateMode4(timestamp, dt) {
+    const t = window.target;
+    if(!t) return;
+
+    if (mode4State === 'reset') {
+        const dx = window.mouseX - (window.canvasWidth / 2);
+        const dy = window.mouseY - (window.canvasHeight / 2);
+        const dist = Math.sqrt(dx*dx + dy*dy);
         
-        const recentEnemies = targetHistory.slice(-10).filter(t => t === 0).length;
-        const recentFriends = 10 - recentEnemies;
-        
-        let enemyChance = CFG.targetRatio;
-        if (recentEnemies >= 8) enemyChance = 0.3;
-        else if (recentFriends >= 6) enemyChance = 0.8;
-        else enemyChance = CFG.targetRatio + (Math.random() - 0.5) * 0.2;
-        
-        target.type = Math.random() < enemyChance ? 0 : 1;
-        targetHistory[targetHistory.length - 1] = target.type;
-        
-        // Initialize contrast if first target
-        if (shots === 0 || !target.contrast) {
-            target.contrast = CFG.gabor.startContrast;
+        if (dist < CFG.landolt.resetRadius) {
+            playSound('click'); 
+            spawnMode4Target();
         }
-        
-    } else if (currentMode === 2) {
-        // Mode 2: Moving target
-        const angle = Math.random() * Math.PI * 2;
-        const speed = CFG.mode2[currentDifficulty].speed;
-        target.vx = Math.cos(angle) * speed;
-        target.vy = Math.sin(angle) * speed;
-        
-    } else if (currentMode === 3) {
-        // Mode 3: Surgical precision - slight drift
-        target.vx = (Math.random() - 0.5) * 0.3;
-        target.vy = (Math.random() - 0.5) * 0.3;
-        target.type = 0;  // Always enemy
+    } else {
+        const age = timestamp - t.spawnTime;
+        if (age > t.timeout) {
+            misses++;
+            flashEffect('warn', 'TOO SLOW');
+            playSound('miss');
+            initMode4();
+        }
     }
 }
 
-// Trigger penalty flash and pause
-function triggerPenalty(msg, hitType = null) {
-    penaltyActive = true;
-    penaltyEndTime = performance.now() + 1500;
-    
-    const isGaze = msg.includes('GAZE');
-    const flashEl = isGaze ? 'flash-warn' : 'flash-penalty';
-    const textEl = isGaze ? 'flash-text-warn' : 'flash-text-penalty';
-    
-    let displayMsg = msg;
-    if (hitType === 'hit') displayMsg = msg + ' (-3)';
-    else if (hitType === 'miss') displayMsg = msg + ' (-2)';
-    else if (msg === 'PRECISION FAIL') displayMsg = msg + ' (-50)';
-    
-    document.getElementById(flashEl).classList.add('active');
-    document.getElementById(textEl).innerText = displayMsg;
-    document.getElementById(textEl).classList.add('active');
-    
-    setTimeout(() => {
-        document.getElementById(flashEl).classList.remove('active');
-        document.getElementById(textEl).classList.remove('active');
-    }, 300);
-    
-    updateHUD();
+function handleMode4Click(dist) {
+    const t = window.target;
+    if (mode4State === 'target') {
+        if (dist <= t.size * 2) { // Generous hitbox for tiny targets
+            score += 100;
+            hits++;
+            playSound('hit');
+            reactionTimes.push(performance.now() - t.spawnTime);
+            initMode4(); 
+        } else {
+            // Optional miss penalty logic here
+        }
+    }
 }
 
-// Show feedback message
-function showFeedback(msg, type) {
-    const flashEl = type === 'warn' ? 'flash-warn' : 'flash-penalty';
-    const textEl = type === 'warn' ? 'flash-text-warn' : 'flash-text-penalty';
-    
-    document.getElementById(flashEl).classList.add('active');
-    document.getElementById(textEl).innerText = msg + ' (-1)';
-    document.getElementById(textEl).classList.add('active');
+// ===== UTILS =====
+function startAfterGaze() {
+    const t = window.target;
+    t.deadTime = performance.now();
+    t.deadX = t.x;
+    t.deadY = t.y;
     
     setTimeout(() => {
-        document.getElementById(flashEl).classList.remove('active');
-        document.getElementById(textEl).classList.remove('active');
-    }, 200);
+        if (window.gamePhase === 'playing') {
+            if (currentMode === 2) initMode2Target();
+            else spawnTarget();
+        }
+    }, CFG.afterGazeTime);
+}
+
+function flashEffect(type, text) {
+    const el = document.getElementById(type === 'penalty' ? 'flash-penalty' : 'flash-warn');
+    const txt = document.getElementById(type === 'penalty' ? 'flash-text-penalty' : 'flash-text-warn');
+    const t = window.target;
+    
+    if (el) {
+        el.style.opacity = 0.3;
+        setTimeout(() => el.style.opacity = 0, 150);
+    }
+    
+    if (txt && text && t) {
+        txt.innerText = text;
+        txt.style.display = 'block';
+        txt.style.opacity = 1;
+        txt.style.top = (t.y - 50) + 'px';
+        txt.style.left = t.x + 'px';
+        setTimeout(() => {
+            txt.style.opacity = 0;
+            setTimeout(() => txt.style.display = 'none', 200);
+        }, 500);
+    }
 }

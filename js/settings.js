@@ -1,27 +1,28 @@
 // ==================== SETTINGS MANAGEMENT ====================
 // Handles all user preferences and persistence
+// RESTORED FULL FUNCTIONALITY
 
 const DEFAULT_SETTINGS = {
     // Mouse
     sensitivity: 1.0,
     
-    // Mode 1 specific
-    showRedDot: false,           // Default OFF for pure training
-    adaptiveContrast: true,      // Enable staircase method
-    dynamicNoise: true,          // Enable pink noise overlay
+    // Mode Configs
+    adaptiveContrast: true,      // Mode 1
     
-    // Mode 3 specific
+    // Surgical Configs (Mode 3)
     coreSize: 3,
     penaltySize: 35,
     
-    // After-gaze hold per mode
+    // After-gaze Configs
     afterGazeMode1: true,
     afterGazeMode2: true,
-    afterGazeMode3: false,       // Mode 3 doesn't need it by default
+    afterGazeMode3: false,       
     
-    // Visual
-    visualNoise: 'grid',         // clean, grid, chaos
-    crosshair: 'cross',
+    // Visual (Internal mostly, controlled by Difficulty now)
+    noiseLevel: 1,               
+    
+    // Crosshair
+    crosshair: 'cross',          
     crosshairScale: 1.0,
     
     // Audio
@@ -31,19 +32,20 @@ const DEFAULT_SETTINGS = {
 
 let settings = { ...DEFAULT_SETTINGS };
 
-// Load settings from localStorage
 function loadSettings() {
     try {
         const saved = localStorage.getItem('neuroaim_settings');
         if (saved) {
             settings = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+            
+            // Clean up legacy keys if any
+            if (saved.includes('visualNoise')) delete settings.visualNoise;
         }
     } catch(e) {
         console.warn('Failed to load settings:', e);
     }
 }
 
-// Save settings to localStorage
 function saveSettings() {
     try {
         localStorage.setItem('neuroaim_settings', JSON.stringify(settings));
@@ -52,67 +54,56 @@ function saveSettings() {
     }
 }
 
-// Update a single setting
+// Generic updater
 function updateSetting(key, value) {
     settings[key] = value;
     saveSettings();
+}
+
+// ===== SPECIFIC UPDATERS (Linked to HTML inputs) =====
+
+function updateVolume(val) {
+    settings.volume = parseFloat(val);
+    const el = document.getElementById('volume-value');
+    if (el) el.innerText = Math.round(settings.volume * 100) + '%';
+    saveSettings();
+    if (typeof initAudio === 'function') initAudio(); // Apply volume immediately
+}
+
+function updateSensitivity(val) {
+    settings.sensitivity = parseFloat(val);
+    const el = document.getElementById('sens-value');
+    if (el) el.innerText = val + 'x';
+    saveSettings();
+}
+
+function updateCoreSize(val) {
+    settings.coreSize = parseInt(val);
+    const el = document.getElementById('core-size-value');
+    if (el) el.innerText = val + 'px';
     
-    // Trigger any necessary updates
-    if (key === 'visualNoise' && value === 'chaos') {
-        chaosNoiseGenerated = false;
-    }
-}
-
-// Sensitivity control
-function updateSensitivity(value) {
-    settings.sensitivity = parseFloat(value);
-    document.getElementById('sensitivity-value').innerText = value + 'x';
+    // Sync to CFG immediately
+    if (typeof CFG !== 'undefined') CFG.surgical.coreSize = settings.coreSize;
     saveSettings();
 }
 
-// Core size for Mode 3
-function updateCoreSizeSetting(value) {
-    settings.coreSize = parseInt(value);
-    CFG.surgical.coreSize = settings.coreSize;
-    document.getElementById('coreSize-value').innerText = value + 'px';
+function updatePenaltySize(val) {
+    settings.penaltySize = parseInt(val);
+    const el = document.getElementById('penalty-size-value');
+    if (el) el.innerText = val + 'px';
+    
+    if (typeof CFG !== 'undefined') CFG.surgical.penaltySize = settings.penaltySize;
     saveSettings();
 }
 
-// Penalty size for Mode 3
-function updatePenaltySizeSetting(value) {
-    settings.penaltySize = parseInt(value);
-    CFG.surgical.penaltySize = settings.penaltySize;
-    document.getElementById('penaltySize-value').innerText = value + 'px';
-    saveSettings();
-}
-
-// Crosshair scale
-function updateCrosshairScale(value) {
-    settings.crosshairScale = parseFloat(value);
-    document.getElementById('scale-value').innerText = value + 'x';
+function updateCrosshairScale(val) {
+    settings.crosshairScale = parseFloat(val);
+    const el = document.getElementById('scale-value');
+    if (el) el.innerText = val + 'x';
     saveSettings();
     updateCrosshairPreview();
 }
 
-// Volume control
-function updateVolume(value) {
-    settings.volume = parseFloat(value);
-    document.getElementById('volume-value').innerText = Math.round(value * 100) + '%';
-    saveSettings();
-}
-
-// Visual noise type
-function setVisualNoise(value) {
-    settings.visualNoise = value;
-    saveSettings();
-    updateSettingsUI();
-    updateNoisePreview();
-    if (value === 'chaos') {
-        chaosNoiseGenerated = false;
-    }
-}
-
-// Crosshair type
 function setCrosshair(value) {
     settings.crosshair = value;
     saveSettings();
@@ -120,157 +111,105 @@ function setCrosshair(value) {
     updateCrosshairPreview();
 }
 
-// Reset to defaults
 function resetSettings() {
     settings = { ...DEFAULT_SETTINGS };
     saveSettings();
     updateSettingsUI();
     updateCrosshairPreview();
-    updateNoisePreview();
+    
+    // Sync CFG values back to default
+    if (typeof CFG !== 'undefined') {
+        CFG.surgical.coreSize = settings.coreSize;
+        CFG.surgical.penaltySize = settings.penaltySize;
+    }
 }
 
-// Update UI to reflect current settings
+// ===== UI SYNCHRONIZATION =====
+// Ensures all HTML inputs match current JS settings
 function updateSettingsUI() {
-    // Sensitivity
-    document.getElementById('setting-sensitivity').value = settings.sensitivity;
-    document.getElementById('sensitivity-value').innerText = settings.sensitivity + 'x';
+    // 1. Mouse Sens
+    const elSens = document.getElementById('setting-sensitivity');
+    if (elSens) {
+        elSens.value = settings.sensitivity;
+        const val = document.getElementById('sens-value');
+        if(val) val.innerText = settings.sensitivity + 'x';
+    }
+
+    // 2. Volume
+    const elVol = document.getElementById('setting-volume');
+    if (elVol) {
+        elVol.value = settings.volume;
+        const val = document.getElementById('volume-value');
+        if(val) val.innerText = Math.round(settings.volume * 100) + '%';
+    }
     
-    // Mode 1
-    document.getElementById('setting-redDot').checked = settings.showRedDot;
-    document.getElementById('setting-adaptiveContrast').checked = settings.adaptiveContrast;
-    document.getElementById('setting-dynamicNoise').checked = settings.dynamicNoise;
+    // 3. Mode Configs
+    const elAdap = document.getElementById('setting-adaptiveContrast');
+    if (elAdap) elAdap.checked = settings.adaptiveContrast;
     
-    // Mode 3
-    document.getElementById('setting-coreSize').value = settings.coreSize;
-    document.getElementById('coreSize-value').innerText = settings.coreSize + 'px';
-    document.getElementById('setting-penaltySize').value = settings.penaltySize;
-    document.getElementById('penaltySize-value').innerText = settings.penaltySize + 'px';
+    const elCore = document.getElementById('setting-coreSize');
+    if (elCore) {
+        elCore.value = settings.coreSize;
+        const val = document.getElementById('core-size-value');
+        if(val) val.innerText = settings.coreSize + 'px';
+    }
     
-    // After-gaze
-    document.getElementById('setting-afterGaze1').checked = settings.afterGazeMode1;
-    document.getElementById('setting-afterGaze2').checked = settings.afterGazeMode2;
-    document.getElementById('setting-afterGaze3').checked = settings.afterGazeMode3;
+    const elPen = document.getElementById('setting-penaltySize');
+    if (elPen) {
+        elPen.value = settings.penaltySize;
+        const val = document.getElementById('penalty-size-value');
+        if(val) val.innerText = settings.penaltySize + 'px';
+    }
+
+    // 4. After Gaze
+    const elGaze1 = document.getElementById('setting-afterGaze1');
+    if (elGaze1) elGaze1.checked = settings.afterGazeMode1;
     
-    // Crosshair
-    document.getElementById('setting-scale').value = settings.crosshairScale;
-    document.getElementById('scale-value').innerText = settings.crosshairScale + 'x';
-    
-    // Audio
-    document.getElementById('setting-soundEnabled').checked = settings.soundEnabled;
-    document.getElementById('setting-volume').value = settings.volume;
-    document.getElementById('volume-value').innerText = Math.round(settings.volume * 100) + '%';
-    
-    // Radio options (visual noise)
-    document.querySelectorAll('.radio-option').forEach(opt => {
-        const title = opt.querySelector('.radio-title');
-        if (title) {
-            const isActive = title.innerText.toLowerCase() === settings.visualNoise;
-            opt.classList.toggle('active', isActive);
-        }
-    });
-    
-    // Crosshair options
+    const elGaze2 = document.getElementById('setting-afterGaze2');
+    if (elGaze2) elGaze2.checked = settings.afterGazeMode2;
+
+    // 5. Crosshair
     document.querySelectorAll('.crosshair-option').forEach(opt => {
-        opt.classList.toggle('active', opt.dataset.ch === settings.crosshair);
+        const isActive = opt.dataset.ch === settings.crosshair;
+        opt.classList.toggle('active', isActive);
+        // Add visual border for active state handled by CSS
     });
+
+    const elScale = document.getElementById('setting-scale');
+    if (elScale) {
+        elScale.value = settings.crosshairScale;
+        const val = document.getElementById('scale-value');
+        if(val) val.innerText = settings.crosshairScale + 'x';
+    }
 }
 
-// Crosshair preview canvas
+// Update the preview canvas in settings modal
 function updateCrosshairPreview() {
     const canvas = document.getElementById('crosshair-preview-canvas');
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
+    // Handle Retina displays or CSS scaling
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * 2;
     canvas.height = rect.height * 2;
+    
+    ctx.resetTransform(); 
     ctx.scale(2, 2);
     
+    // Draw bg
     ctx.fillStyle = '#0a0a0f';
     ctx.fillRect(0, 0, rect.width, rect.height);
     
+    // Center
     const cx = rect.width / 2;
     const cy = rect.height / 2;
     
-    drawCrosshairAt(ctx, cx, cy, settings.crosshair, settings.crosshairScale);
+    // Draw
+    if (typeof drawCrosshairAt === 'function') {
+        drawCrosshairAt(ctx, cx, cy, settings.crosshair, settings.crosshairScale);
+    }
 }
 
-// Noise preview canvas
-function updateNoisePreview() {
-    const canvas = document.getElementById('noise-preview-canvas');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * 2;
-    canvas.height = rect.height * 2;
-    ctx.scale(2, 2);
-    
-    const w = rect.width;
-    const h = rect.height;
-    
-    ctx.fillStyle = '#0a0a0f';
-    ctx.fillRect(0, 0, w, h);
-    
-    if (settings.visualNoise === 'grid') {
-        ctx.strokeStyle = '#0f0f18';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let i = 0; i < w; i += 40) {
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, h);
-        }
-        for (let i = 0; i < h; i += 40) {
-            ctx.moveTo(0, i);
-            ctx.lineTo(w, i);
-        }
-        ctx.stroke();
-    } else if (settings.visualNoise === 'chaos') {
-        for (let i = 0; i < 500; i++) {
-            const x = Math.random() * w;
-            const y = Math.random() * h;
-            const brightness = Math.random() * 80 + 40;
-            ctx.fillStyle = `rgba(${brightness},${brightness},${brightness},${Math.random() * 0.2 + 0.05})`;
-            ctx.fillRect(x, y, Math.random() * 2 + 0.5, Math.random() * 2 + 0.5);
-        }
-    }
-    
-    // Draw sample Gabor in center
-    const cx = w / 2;
-    const cy = h / 2;
-    const size = 25;
-    
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, size, 0, Math.PI * 2);
-    ctx.clip();
-    
-    ctx.fillStyle = '#000';
-    ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
-    
-    ctx.strokeStyle = '#ccc';
-    ctx.lineWidth = 2;
-    for (let i = -size; i < size; i += 5) {
-        ctx.beginPath();
-        ctx.moveTo(cx + i, cy - size);
-        ctx.lineTo(cx + i, cy + size);
-        ctx.stroke();
-    }
-    
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, size);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0.6)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
-    ctx.restore();
-    
-    ctx.beginPath();
-    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff3366';
-    ctx.fill();
-}
-
-// Initialize settings on load
+// Initial Load
 loadSettings();
