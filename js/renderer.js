@@ -1,5 +1,6 @@
 // ==================== RENDERER ====================
 // All canvas drawing functions
+// UPDATED: Mode 3 random core, Mode 2 afterGaze, Mode 4 larger reset
 
 function drawBackground(ctx, width, height) {
     ctx.fillStyle = '#050508';
@@ -57,6 +58,9 @@ function drawGaborStruct(ctx, x, y, size, isVertical, opacity) {
 function drawGaborTarget(ctx) {
     const t = window.target;
     if(!t) return;
+    // Sync with noise strobe
+    if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
+    
     let contrast = 1.0;
     if (settings.adaptiveContrast) contrast = t.contrast;
     drawGaborStruct(ctx, t.x, t.y, CFG.gaborSize, t.type === 0, contrast);
@@ -66,6 +70,12 @@ function drawGaborTarget(ctx) {
 function drawTrackingTarget(ctx) {
     const t = window.target;
     if(!t) return;
+    
+    // Sync with noise strobe
+    if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
+    
+    // Don't draw if in afterGaze phase (target is dead)
+    if (t.isDead) return;
     
     const x = t.x, y = t.y;
     const size = CFG.tracking.targetSize;
@@ -104,92 +114,186 @@ function drawTrackingTarget(ctx) {
     ctx.restore();
 }
 
-// Mode 3: Surgical Target
+// Mode 2: AfterGaze Phase Indicator
+function drawMode2AfterGaze(ctx) {
+    if (typeof mode2AfterGazeState === 'undefined' || !mode2AfterGazeState) return;
+    // Sync with noise strobe
+    if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
+    
+    const { deadX, deadY, startTime, brokeGaze } = mode2AfterGazeState;
+    const elapsed = performance.now() - startTime;
+    const totalTime = CFG.afterGazeTime + (brokeGaze ? CFG.mode2.afterGazeDelayPenalty : 0);
+    const progress = Math.min(1, elapsed / totalTime);
+    
+    ctx.save();
+    
+    // Draw gaze hold zone
+    const radius = CFG.mode2.gazeRadius;
+    
+    // Outer boundary
+    ctx.beginPath();
+    ctx.arc(deadX, deadY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = brokeGaze ? 'rgba(255, 100, 100, 0.3)' : 'rgba(0, 255, 150, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Progress ring (countdown)
+    ctx.beginPath();
+    ctx.arc(deadX, deadY, radius - 5, -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * (1 - progress)));
+    ctx.strokeStyle = brokeGaze ? '#ff6666' : '#00ff99';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Center point (where target was)
+    ctx.beginPath();
+    ctx.arc(deadX, deadY, 5, 0, Math.PI * 2);
+    ctx.fillStyle = brokeGaze ? '#ff6666' : '#00ff99';
+    ctx.fill();
+    
+    // Text
+    ctx.font = '11px JetBrains Mono';
+    ctx.fillStyle = brokeGaze ? '#ff6666' : '#00ff99';
+    ctx.textAlign = 'center';
+    ctx.fillText(brokeGaze ? 'GAZE BROKEN' : 'HOLD STEADY', deadX, deadY + radius + 20);
+    
+    ctx.restore();
+}
+
+// Mode 3: Surgical Target (UPDATED with random core position)
 function drawSurgicalTarget(ctx) {
     const t = window.target;
     if(!t) return;
     if (typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
 
-    const x = t.x, y = t.y;
+    const x = t.x, y = t.y; // Penalty zone center
+    // Fallback to center if coreX/coreY not set
+    const coreX = (t.coreX !== undefined) ? t.coreX : x;
+    const coreY = (t.coreY !== undefined) ? t.coreY : y;
     const coreSize = CFG.surgical.coreSize;
     const penaltySize = CFG.surgical.penaltySize;
     
+    ctx.save();
+    
+    // Draw penalty zone (red halo)
     ctx.beginPath();
     ctx.arc(x, y, penaltySize, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 50, 80, 0.12)';
-    ctx.strokeStyle = 'rgba(255, 50, 80, 0.35)';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(255, 50, 80, 0.15)';
+    ctx.strokeStyle = 'rgba(255, 50, 80, 0.5)';
+    ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
     
+    // Draw core at random position - more visible
     ctx.beginPath();
-    ctx.arc(x, y, coreSize, 0, Math.PI * 2);
+    ctx.arc(coreX, coreY, coreSize, 0, Math.PI * 2);
     ctx.fillStyle = '#00d9ff';
     ctx.shadowColor = '#00d9ff';
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 20;
     ctx.fill();
+    
+    // Add a bright center dot
+    ctx.beginPath();
+    ctx.arc(coreX, coreY, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    
     ctx.shadowBlur = 0;
+    ctx.restore();
 }
 
-// Mode 4: Landolt C
+// Mode 4: Landolt C (UPDATED with larger click-to-reset button)
 function drawLandoltTarget(ctx) {
     const t = window.target;
     if(!t) return;
+    
+    // Sync with noise strobe (but always show reset point)
+    if (!t.isResetPoint && typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
 
     if (t.isResetPoint) {
-        // Draw Center Reset Indicator
+        // Draw Center Reset Button (LARGER)
         const cx = window.canvasWidth / 2;
         const cy = window.canvasHeight / 2;
+        const clickRadius = CFG.landolt.resetClickRadius || 40;
         
         ctx.save();
-        // Inner dot
+        
+        // Outer clickable ring
         ctx.beginPath();
-        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.arc(cx, cy, clickRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 217, 255, 0.1)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 217, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Inner filled circle
+        ctx.beginPath();
+        ctx.arc(cx, cy, clickRadius * 0.4, 0, Math.PI * 2);
         ctx.fillStyle = '#00d9ff'; 
         ctx.shadowColor = '#00d9ff';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 20;
         ctx.fill();
         ctx.shadowBlur = 0;
         
-        // Pulse ring
-        const pulse = (performance.now() % 1000) / 1000;
+        // Pulse ring animation
+        const pulse = (performance.now() % 1500) / 1500;
         ctx.beginPath();
-        ctx.arc(cx, cy, 20 + pulse * 10, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 217, 255, ${1 - pulse})`;
-        ctx.lineWidth = 1;
+        ctx.arc(cx, cy, clickRadius + pulse * 20, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 217, 255, ${0.5 * (1 - pulse)})`;
+        ctx.lineWidth = 2;
         ctx.stroke();
         
-        ctx.font = '12px JetBrains Mono';
+        // Cross indicator inside
+        ctx.strokeStyle = '#0a0a0f';
+        ctx.lineWidth = 3;
+        const crossSize = clickRadius * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(cx - crossSize, cy);
+        ctx.lineTo(cx + crossSize, cy);
+        ctx.moveTo(cx, cy - crossSize);
+        ctx.lineTo(cx, cy + crossSize);
+        ctx.stroke();
+        
+        // Text
+        ctx.font = 'bold 14px JetBrains Mono';
         ctx.fillStyle = '#00d9ff';
         ctx.textAlign = 'center';
-        ctx.fillText("RESET", cx, cy + 40);
+        ctx.fillText("CLICK TO START", cx, cy + clickRadius + 30);
+        
         ctx.restore();
         return;
     }
 
-    // Actual Target
-    const { x, y, size, gapDir, contrast } = t;
+    // Actual Landolt C Target
+    const x = t.x;
+    const y = t.y;
+    const size = t.size || 20;
+    const gapDir = t.gapDir !== undefined ? t.gapDir : 0;
+    const contrast = t.contrast !== undefined ? t.contrast : 1.0;
     
     ctx.save();
-    ctx.globalAlpha = contrast;
+    ctx.globalAlpha = Math.max(contrast, 0.3); // Ensure minimum visibility
     
     const color = '#00d9ff'; 
     ctx.strokeStyle = color;
-    ctx.lineWidth = size * 0.25; 
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = Math.max(size * 0.2, 3); // Ensure minimum line width
     
-    const gapSize = Math.PI / 3; 
-    let startAngle = 0;
-    let endAngle = 0;
+    const gapSize = Math.PI / 5; // Standard Landolt Ring gap (~36°)
     
     // gapDir: 0:Right, 1:Down, 2:Left, 3:Up
     const offset = gapDir * (Math.PI / 2);
-    startAngle = offset + gapSize / 2;
-    endAngle = offset + (Math.PI * 2) - gapSize / 2;
+    const startAngle = offset + gapSize / 2;
+    const endAngle = offset + (Math.PI * 2) - gapSize / 2;
     
     ctx.beginPath();
-    ctx.arc(x, y, size/2, startAngle, endAngle);
+    ctx.arc(x, y, size / 2, startAngle, endAngle);
     ctx.stroke();
     
+    ctx.shadowBlur = 0;
     ctx.restore();
 }
 
@@ -219,7 +323,6 @@ function drawCrosshairAt(ctx, x, y, type, scale) {
     ctx.fillStyle = color;
     ctx.lineWidth = 1.5;
     
-    // Default fallback
     if (x === undefined || y === undefined) return;
 
     switch (type) {

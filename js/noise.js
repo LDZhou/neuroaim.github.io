@@ -65,15 +65,13 @@ const NoiseSystem = {
         
         if (!this.gaborCache) this.createGaborCache();
         
-        if (level === 0) return; // Clean
+        if (level === 0) return;
 
         if (mode === 1) {
             this.generateGaborParticles(this.w, this.h, level);
         } else if (mode === 2) {
-            // Mode 2 pure tracking has no noise usually (level 1 only)
             if (level === 1) return;
         } else {
-            // Mode 3 and Mode 4 use Pixel Decoys
             this.generateDecoyParticles(this.w, this.h, level);
         }
     },
@@ -102,6 +100,11 @@ const NoiseSystem = {
 
     generateDecoyParticles(w, h, level) {
         const density = level === 2 ? 80 : 200;
+        
+        // Get Mode 3 target sizes from config for matching decoys
+        const coreSize = CFG.surgical.coreSize;
+        const penaltySize = CFG.surgical.penaltySize;
+        
         for (let i = 0; i < density; i++) {
             const type = Math.random();
             this.particles.push({
@@ -111,7 +114,10 @@ const NoiseSystem = {
                 vy: (Math.random() - 0.5) * 4,
                 changeDirTimer: Math.random() * 3000,
                 type: type,
-                isPixel: true
+                isPixel: true,
+                // Store sizes for consistent drawing
+                coreSize: coreSize,
+                penaltySize: penaltySize
             });
         }
     },
@@ -120,7 +126,6 @@ const NoiseSystem = {
         const level = settings.noiseLevel;
         if (level === 0) return;
 
-        // 1. Move Particles (Apply Speed Scale)
         if (this.particles.length > 0) {
             const margin = 50;
             this.particles.forEach(p => {
@@ -145,7 +150,6 @@ const NoiseSystem = {
             });
         }
 
-        // 2. Strobe Logic
         if (level === 4) {
             this.strobeTimer += dt;
             if (this.strobeTimer >= this.currentStrobePeriod) {
@@ -164,10 +168,15 @@ const NoiseSystem = {
         const level = settings.noiseLevel;
         if (level === 0) return;
         
+        // Level 4 strobe: when isBlindPhase, BOTH noise and target are hidden (sync)
+        if (level === 4 && this.isBlindPhase) {
+            // Don't draw noise during blind phase - target is also hidden
+            // Screen goes dark together
+            return;
+        }
+        
         let alpha = 1.0;
-        if (level === 4) {
-            alpha = this.isBlindPhase ? CFG.noise.strobe.blindAlpha : CFG.noise.strobe.clearAlpha;
-        } else if (level === 3) {
+        if (level === 3) {
             alpha = 0.8;
         } else if (level === 2) {
             alpha = 0.5;
@@ -202,18 +211,35 @@ const NoiseSystem = {
                     ctx.restore();
                 }
             } else if (p.isPixel) {
-                if (p.type < 0.33) {
+                // Draw decoys EXACTLY like Mode 3 target
+                const coreSize = p.coreSize || CFG.surgical.coreSize;
+                const penaltySize = p.penaltySize || CFG.surgical.penaltySize;
+                
+                if (p.type < 0.4) {
+                    // Cyan core - same as target core
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
-                    ctx.fillStyle = 'rgba(0, 217, 255, 0.8)';
+                    ctx.arc(p.x, p.y, coreSize, 0, Math.PI * 2);
+                    ctx.fillStyle = '#00d9ff';
+                    ctx.shadowColor = '#00d9ff';
+                    ctx.shadowBlur = 20;
                     ctx.fill();
-                } else if (p.type < 0.66) {
+                    // White center dot
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 35, 0, Math.PI*2);
-                    ctx.strokeStyle = 'rgba(255, 50, 80, 0.4)';
-                    ctx.lineWidth = 1;
+                    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                } else if (p.type < 0.7) {
+                    // Red penalty zone - same as target halo
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, penaltySize, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 50, 80, 0.15)';
+                    ctx.strokeStyle = 'rgba(255, 50, 80, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.fill();
                     ctx.stroke();
                 } else {
+                    // Small noise pixels
                     ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
                     ctx.fillRect(p.x, p.y, 2, 2);
                 }

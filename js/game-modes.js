@@ -1,5 +1,6 @@
 // ==================== GAME MODES ====================
 // Mode-specific logic and click handlers
+// UPDATED: Mode 2 afterGaze, Mode 3 random core, Mode 4 click reset
 
 // Helper: Movement update
 function updateMovement(obj, dt, speedMultiplier = 1.0) {
@@ -93,7 +94,9 @@ function handleMode1Click(dist) {
     }
 }
 
-// ===== MODE 2: PURE TRACKING =====
+// ===== MODE 2: PURE TRACKING (UPDATED with afterGaze enforcement) =====
+var mode2AfterGazeState = null; // { deadX, deadY, startTime, brokeGaze, nextSpawnDelay }
+
 function initMode2Target() {
     const w = window.canvasWidth;
     const h = window.canvasHeight;
@@ -102,40 +105,69 @@ function initMode2Target() {
     const y = margin + Math.random() * (h - margin * 2);
     const speed = CFG.mode2[currentDifficulty] || 6;
     
+    mode2AfterGazeState = null;
+    
     window.target = {
         x: x, y: y,
         vx: (Math.random() - 0.5) * speed,
         vy: (Math.random() - 0.5) * speed,
         changeDirTimer: Math.random() * 3000,
         trackProgress: 0,
-        isLocked: false 
+        isLocked: false,
+        isDead: false
     };
 }
 
 function updateMode2(timestamp, dt) {
     const t = window.target;
     if (!t) { initMode2Target(); return; }
-    if (!t.vx) initMode2Target();
+    if (!t.vx && !t.isDead) initMode2Target();
+    
+    // Handle afterGaze phase
+    if (mode2AfterGazeState) {
+        const elapsed = performance.now() - mode2AfterGazeState.startTime;
+        const gazeTime = CFG.afterGazeTime + (mode2AfterGazeState.brokeGaze ? CFG.mode2.afterGazeDelayPenalty : 0);
+        
+        // Check if mouse moved away during afterGaze
+        if (!mode2AfterGazeState.brokeGaze) {
+            const dx = window.mouseX - mode2AfterGazeState.deadX;
+            const dy = window.mouseY - mode2AfterGazeState.deadY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > CFG.mode2.gazeRadius) {
+                mode2AfterGazeState.brokeGaze = true;
+                score += CFG.mode2.afterGazePenalty;
+                flashEffect('warn', 'BROKE GAZE');
+                playSound('error');
+                
+                // Track gaze breaks for stats
+                if (!window.gazeBreaks) window.gazeBreaks = 0;
+                window.gazeBreaks++;
+            }
+        }
+        
+        if (elapsed >= gazeTime) {
+            mode2AfterGazeState = null;
+            initMode2Target();
+        }
+        return;
+    }
     
     updateMovement(t, dt / 16.67);
     
-    // Logic Fix: Ensure mouse coords are valid
     const dx = window.mouseX - t.x;
     const dy = window.mouseY - t.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
     
-    // Tracking radius = target size + margin
     const radius = CFG.tracking.targetSize + 15; 
     
     if (dist <= radius) {
-        // Gain Lock
         t.trackProgress += dt / 1000; 
         if (t.trackProgress >= CFG.tracking.lockThreshold) {
             t.trackProgress = CFG.tracking.lockThreshold;
             t.isLocked = true; 
         }
     } else {
-        // Decay Lock
         t.trackProgress = Math.max(0, t.trackProgress - (dt / 500));
         if (t.trackProgress < CFG.tracking.lockThreshold) {
             t.isLocked = false;
@@ -145,42 +177,94 @@ function updateMode2(timestamp, dt) {
 
 function handleMode2Click(dist) {
     const t = window.target;
-    // Must be locked (Green) to kill
+    if (t.isDead || mode2AfterGazeState) return;
+    
     if (t.isLocked) {
         score += 200;
         hits++;
         playSound('hit');
-        flashEffect('hit', 'ELIMINATED');
-        startAfterGaze();
-    } else {
-        // Clicked while tracking but not locked? 
-        // Maybe feedback?
+        reactionTimes.push(performance.now() - (t.spawnTime || performance.now()));
+        
+        // Start afterGaze phase
+        t.isDead = true;
+        mode2AfterGazeState = {
+            deadX: t.x,
+            deadY: t.y,
+            startTime: performance.now(),
+            brokeGaze: false
+        };
+        
+        // Store for drawing
+        t.deadTime = performance.now();
+        t.deadX = t.x;
+        t.deadY = t.y;
     }
 }
 
-// ===== MODE 3: SURGICAL LOCK =====
-function updateMode3(timestamp, dt) { /* Static target */ }
+// ===== MODE 3: SURGICAL LOCK (UPDATED with random core position) =====
+function spawnMode3Target() {
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
+    const margin = 100;
+    const x = margin + Math.random() * (w - margin * 2);
+    const y = margin + Math.random() * (h - margin * 2);
+    
+    // Calculate random core offset within penalty zone
+    const maxOffset = (CFG.surgical.penaltySize - CFG.surgical.coreSize - 5) * CFG.surgical.coreOffsetMax;
+    const offsetAngle = Math.random() * Math.PI * 2;
+    const offsetDist = Math.random() * maxOffset;
+    
+    const coreOffsetX = Math.cos(offsetAngle) * offsetDist;
+    const coreOffsetY = Math.sin(offsetAngle) * offsetDist;
+    
+    window.target = {
+        x: x, y: y, // Center of penalty zone
+        coreX: x + coreOffsetX, // Actual core position
+        coreY: y + coreOffsetY,
+        spawnTime: performance.now(),
+        deadTime: 0
+    };
+}
+
+function updateMode3(timestamp, dt) {
+    // Static target, no movement needed
+}
 
 function handleMode3Click(dist) {
-    if (dist <= CFG.surgical.coreSize + 2) {
+    const t = window.target;
+    
+    // Calculate distance to actual core
+    const dx = window.mouseX - t.coreX;
+    const dy = window.mouseY - t.coreY;
+    const coreDist = Math.sqrt(dx*dx + dy*dy);
+    
+    // Calculate distance to penalty zone center
+    const penaltyDx = window.mouseX - t.x;
+    const penaltyDy = window.mouseY - t.y;
+    const penaltyDist = Math.sqrt(penaltyDx*penaltyDx + penaltyDy*penaltyDy);
+    
+    if (coreDist <= CFG.surgical.coreSize + 2) {
         score += CFG.surgical.coreScore;
         hits++;
-        playSound('headshot');
-        spawnTarget(); 
-    } else if (dist <= CFG.surgical.penaltySize) {
+        playSound('precision');
+        reactionTimes.push(performance.now() - t.spawnTime);
+        spawnMode3Target();
+    } else if (penaltyDist <= CFG.surgical.penaltySize) {
         score += CFG.surgical.penaltyScore;
+        misses++;
         flashEffect('penalty', 'IMPURE');
         playSound('error');
+        spawnMode3Target();
     } else {
         score += CFG.surgical.missScore;
     }
 }
 
-// ===== MODE 4: LANDOLT SACCADE =====
-let mode4State = 'reset';
+// ===== MODE 4: LANDOLT SACCADE (UPDATED with click-to-reset) =====
+var mode4State = 'waitingForCenterClick'; // 'waitingForCenterClick' | 'target'
 
 function initMode4() {
-    mode4State = 'reset';
+    mode4State = 'waitingForCenterClick';
     window.target = { 
         x: window.canvasWidth / 2, 
         y: window.canvasHeight / 2,
@@ -191,7 +275,7 @@ function initMode4() {
 function spawnMode4Target() {
     const w = window.canvasWidth;
     const h = window.canvasHeight;
-    const margin = 100;
+    const margin = 120;
     const x = margin + Math.random() * (w - margin * 2);
     const y = margin + Math.random() * (h - margin * 2);
     
@@ -214,37 +298,39 @@ function updateMode4(timestamp, dt) {
     const t = window.target;
     if(!t) return;
 
-    if (mode4State === 'reset') {
-        const dx = window.mouseX - (window.canvasWidth / 2);
-        const dy = window.mouseY - (window.canvasHeight / 2);
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        
-        if (dist < CFG.landolt.resetRadius) {
-            playSound('click'); 
-            spawnMode4Target();
-        }
-    } else {
+    if (mode4State === 'target' && !t.isResetPoint) {
         const age = timestamp - t.spawnTime;
         if (age > t.timeout) {
             misses++;
             flashEffect('warn', 'TOO SLOW');
             playSound('miss');
-            initMode4();
+            initMode4(); // Go back to center click
         }
     }
 }
 
 function handleMode4Click(dist) {
     const t = window.target;
-    if (mode4State === 'target') {
-        if (dist <= t.size * 2) { // Generous hitbox for tiny targets
+    
+    if (mode4State === 'waitingForCenterClick' && t.isResetPoint) {
+        // Check if clicked the center reset button
+        const dx = window.mouseX - (window.canvasWidth / 2);
+        const dy = window.mouseY - (window.canvasHeight / 2);
+        const centerDist = Math.sqrt(dx*dx + dy*dy);
+        
+        if (centerDist <= CFG.landolt.resetClickRadius) {
+            playSound('click');
+            spawnMode4Target();
+        }
+        // Don't count as shot if clicking center
+        shots--;
+    } else if (mode4State === 'target' && !t.isResetPoint) {
+        if (dist <= t.size * 2.5) { // Generous hitbox
             score += 100;
             hits++;
             playSound('hit');
             reactionTimes.push(performance.now() - t.spawnTime);
-            initMode4(); 
-        } else {
-            // Optional miss penalty logic here
+            initMode4(); // Return to center
         }
     }
 }
@@ -274,12 +360,19 @@ function flashEffect(type, text) {
         setTimeout(() => el.style.opacity = 0, 150);
     }
     
-    if (txt && text && t) {
+    if (txt && text) {
         txt.innerText = text;
         txt.style.display = 'block';
         txt.style.opacity = 1;
-        txt.style.top = (t.y - 50) + 'px';
-        txt.style.left = t.x + 'px';
+        
+        if (t) {
+            txt.style.top = (t.y - 50) + 'px';
+            txt.style.left = t.x + 'px';
+        } else {
+            txt.style.top = '50%';
+            txt.style.left = '50%';
+        }
+        
         setTimeout(() => {
             txt.style.opacity = 0;
             setTimeout(() => txt.style.display = 'none', 200);

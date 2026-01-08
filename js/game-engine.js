@@ -1,6 +1,6 @@
 // ==================== GAME ENGINE ====================
 // Core game loop, input handling, state management
-// FIXED: End Game Crash, Mode 2 Input, Safe Globals
+// UPDATED: Mode 3 uses spawnMode3Target
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -11,22 +11,22 @@ window.canvasHeight = window.innerHeight;
 window.gamePhase = 'waiting'; 
 window.mouseX = 0;
 window.mouseY = 0;
-window.target = null; 
+window.target = null;
+window.gazeBreaks = 0; // Track gaze breaks for stats
 
-// Internals
-let currentMode = 1;
-let currentDifficulty = 'medium';
-let score = 0, hits = 0, misses = 0, shots = 0;
-let reactionTimes = [];
-let timeLeft = 0;
-let gameStartTime = 0;
-let lastFrameTime = 0;
+// Internals - GLOBAL for cross-file access
+var currentMode = 1;
+var currentDifficulty = 'medium';
+var score = 0, hits = 0, misses = 0, shots = 0;
+var reactionTimes = [];
+var timeLeft = 0;
+var gameStartTime = 0;
+var lastFrameTime = 0;
 
 function initGame() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    // Safe Init
     try {
         if (typeof loadStats === 'function') loadStats();
         if (typeof loadSettings === 'function') loadSettings();
@@ -35,7 +35,6 @@ function initGame() {
         console.error("Init warning:", e);
     }
     
-    // Listeners (Use Document for reliable capture)
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
     
@@ -63,13 +62,13 @@ function startGame(mode, difficulty) {
     
     // Reset Globals
     score = 0; hits = 0; misses = 0; shots = 0; reactionTimes = [];
+    window.gazeBreaks = 0;
     window.gamePhase = 'waiting';
     
     // Auto Noise & Speed
     let autoNoiseLevel = 1;
     let noiseSpeedScale = 1.0;
 
-    // Difficulty Logic (Same as before)
     if (mode === 1) {
         if (difficulty === 'easy') { autoNoiseLevel = 3; noiseSpeedScale = 1.0; }
         else if (difficulty === 'medium') { autoNoiseLevel = 3; noiseSpeedScale = 1.6; }
@@ -105,6 +104,7 @@ function startGame(mode, difficulty) {
         
         // Mode Specific Init
         if (mode === 4 && typeof initMode4 === 'function') initMode4();
+        else if (mode === 3 && typeof spawnMode3Target === 'function') spawnMode3Target();
         else if (mode === 2 && typeof initMode2Target === 'function') initMode2Target();
         else spawnTarget();
     });
@@ -140,16 +140,26 @@ function startCountdown(seconds, callback) {
 
 function endGame() {
     window.gamePhase = 'ended';
-    playSound('finish');
+    playSound('click');
     
-    // SAFE Stats Saving
     try {
         const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
         const avgRt = reactionTimes.length > 0 
             ? Math.round(reactionTimes.reduce((a,b) => a+b, 0) / reactionTimes.length) 
             : 0;
+        
+        // Calculate additional stats
+        const minRt = reactionTimes.length > 0 ? Math.min(...reactionTimes) : 0;
+        const maxRt = reactionTimes.length > 0 ? Math.max(...reactionTimes) : 0;
+        
+        // Reaction time consistency (standard deviation)
+        let rtStdDev = 0;
+        if (reactionTimes.length > 1) {
+            const mean = avgRt;
+            const squaredDiffs = reactionTimes.map(rt => Math.pow(rt - mean, 2));
+            rtStdDev = Math.round(Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / reactionTimes.length));
+        }
             
-        // Use default if function missing
         if (typeof saveGameStats === 'function') {
             saveGameStats({
                 mode: currentMode,
@@ -157,16 +167,32 @@ function endGame() {
                 score: score,
                 accuracy: accuracy,
                 avgRt: avgRt,
+                minRt: Math.round(minRt),
+                maxRt: Math.round(maxRt),
+                rtStdDev: rtStdDev,
+                hits: hits,
+                misses: misses,
+                shots: shots,
+                gazeBreaks: window.gazeBreaks || 0,
+                reactionTimes: reactionTimes.slice(0, 50), // Store first 50 for analysis
                 timestamp: Date.now()
             });
         }
         
         if (typeof showResults === 'function') {
-            showResults({ score, accuracy, avgRt, hits, misses });
+            showResults({ 
+                score, 
+                accuracy, 
+                avgRt, 
+                hits, 
+                misses,
+                minRt: Math.round(minRt),
+                maxRt: Math.round(maxRt),
+                rtStdDev
+            });
         }
     } catch(e) {
         console.error("CRITICAL: Error in endGame", e);
-        // Force show simple alert or recovery if UI fails
         if (typeof showScreen === 'function') showScreen('result-screen');
     }
 }
@@ -185,7 +211,6 @@ function gameLoop(timestamp) {
         if (timeLeft <= 0) {
             endGame();
         } else {
-            // Game Updates
             if (typeof NoiseSystem !== 'undefined') NoiseSystem.update(dt);
             
             if (currentMode === 1 && typeof updateMode1 === 'function') updateMode1(timestamp, dt);
@@ -209,8 +234,9 @@ function render() {
             else if (currentMode === 3) drawSurgicalTarget(ctx);
             else if (currentMode === 4) drawLandoltTarget(ctx);
             
-            if (window.target.deadTime && performance.now() - window.target.deadTime < CFG.afterGazeTime) {
-                drawAfterGaze(ctx);
+            // Draw afterGaze indicator for Mode 2
+            if (currentMode === 2 && typeof mode2AfterGazeState !== 'undefined' && mode2AfterGazeState) {
+                drawMode2AfterGaze(ctx);
             }
         }
         
@@ -220,7 +246,6 @@ function render() {
 }
 
 function handleMouseMove(e) {
-    // Robust coordinate mapping
     const rect = canvas.getBoundingClientRect();
     window.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
     window.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);

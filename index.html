@@ -35,8 +35,8 @@
             <span class="mode-num">02</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(2)">?</button>
             <h3>PURE TRACKING</h3>
-            <p>Smooth pursuit. Track and hold.</p>
-            <span class="tag">MT/V5 + PURSUIT</span>
+            <p>Smooth pursuit. Track, hold, and <strong>stay steady after kill</strong>.</p>
+            <span class="tag">MT/V5 + PURSUIT + AFTERGAZE</span>
         </div>
         
         <!-- MODE 3 -->
@@ -45,18 +45,18 @@
             <span class="mode-num">03</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(3)">?</button>
             <h3>SURGICAL LOCK</h3>
-            <p>Zero tolerance. Hit Core. Avoid Halo.</p>
+            <p>Zero tolerance. Hit <strong>Random Core</strong>. Avoid Halo.</p>
             <span class="tag">PREMOTOR + INHIBITION</span>
         </div>
         
-        <!-- MODE 4 (NEW) -->
+        <!-- MODE 4 -->
         <div class="mode-card">
             <div onclick="event.stopPropagation(); showDifficultyModal(4)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
             <span class="mode-num">04</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(4)">?</button>
             <h3>LANDOLT SACCADE</h3>
-            <p>Forced Reset. Identify gap. Snap.</p>
-            <span class="tag">FOVEAL + SACCADE</span>
+            <p><strong>Click Center</strong> → Find Target → Click Target → Repeat.</p>
+            <span class="tag">FOVEAL + SACCADE + RESET</span>
         </div>
     </div>
     
@@ -178,8 +178,11 @@
 
 <!-- ===== STATS SCREEN ===== -->
 <div id="stats-screen" class="screen">
-    <div class="stats-header"><h2>ANALYTICS</h2><button class="back-btn" onclick="showScreen('menu-screen')">← BACK</button></div>
-    <div class="no-data" style="text-align:center; padding:50px; color:#555;">(Statistics module preserved)</div>
+    <div class="stats-header">
+        <h2>ANALYTICS</h2>
+        <button class="back-btn" onclick="showScreen('menu-screen')">← BACK</button>
+    </div>
+    <!-- Content populated by stats.js -->
 </div>
 
 <!-- FLASH EFFECTS -->
