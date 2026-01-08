@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neuro-Aim: Optimized Protocol</title>
+    <title>Neuro-Aim: Neural Training Protocol</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -15,13 +15,13 @@
 <div id="menu-screen" class="screen active">
     <div class="logo">
         <h1>NEURO-AIM</h1>
-        <div class="subtitle">Neuro-Optimized Protocol</div>
+        <div class="subtitle">Neural-Optimized Training Protocol</div>
+        <div class="version">v3.0 | 7 MODES | ADAPTIVE DIFFICULTY</div>
     </div>
     
     <div class="mode-selector">
         <!-- MODE 1 -->
-        <div class="mode-card">
-            <div onclick="event.stopPropagation(); showDifficultyModal(1)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
+        <div class="mode-card" onclick="startGame(1)">
             <span class="mode-num">01</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(1)">?</button>
             <h3>GABOR SCOUT</h3>
@@ -30,8 +30,7 @@
         </div>
         
         <!-- MODE 2 -->
-        <div class="mode-card">
-            <div onclick="event.stopPropagation(); showDifficultyModal(2)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
+        <div class="mode-card" onclick="startGame(2)">
             <span class="mode-num">02</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(2)">?</button>
             <h3>PURE TRACKING</h3>
@@ -40,8 +39,7 @@
         </div>
         
         <!-- MODE 3 -->
-        <div class="mode-card">
-            <div onclick="event.stopPropagation(); showDifficultyModal(3)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
+        <div class="mode-card" onclick="startGame(3)">
             <span class="mode-num">03</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(3)">?</button>
             <h3>SURGICAL LOCK</h3>
@@ -50,13 +48,42 @@
         </div>
         
         <!-- MODE 4 -->
-        <div class="mode-card">
-            <div onclick="event.stopPropagation(); showDifficultyModal(4)" style="width:100%; height:100%; position:absolute; top:0; left:0; cursor:pointer; z-index:1;"></div>
+        <div class="mode-card" onclick="startGame(4)">
             <span class="mode-num">04</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(4)">?</button>
             <h3>LANDOLT SACCADE</h3>
             <p>Aim at target → Press <strong>WASD</strong> for gap direction.</p>
             <span class="tag">DISCRIMINATION + VISUOMOTOR</span>
+        </div>
+        
+        <!-- MODE 5 (NEW) -->
+        <div class="mode-card new" onclick="startGame(5)">
+            <span class="mode-num">05</span>
+            <span class="new-badge">NEW</span>
+            <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(5)">?</button>
+            <h3>PARAFOVEAL GHOST</h3>
+            <p>Track center. Shoot <strong>blue</strong> ghosts. Ignore <strong>red</strong>.</p>
+            <span class="tag">PPC + COVERT ATTENTION</span>
+        </div>
+        
+        <!-- MODE 6 (NEW) -->
+        <div class="mode-card new" onclick="startGame(6)">
+            <span class="mode-num">06</span>
+            <span class="new-badge">NEW</span>
+            <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(6)">?</button>
+            <h3>MEMORY SEQUENCER</h3>
+            <p>Memorize <strong>sequence</strong>. Shoot positions in order.</p>
+            <span class="tag">dlPFC + SPATIAL MEMORY</span>
+        </div>
+        
+        <!-- MODE 7 (NEW) -->
+        <div class="mode-card new" onclick="startGame(7)">
+            <span class="mode-num">07</span>
+            <span class="new-badge">NEW</span>
+            <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(7)">?</button>
+            <h3>COGNITIVE SWITCH</h3>
+            <p>Rules change with <strong>environment</strong>. Adapt instantly.</p>
+            <span class="tag">ACC + RULE FLEXIBILITY</span>
         </div>
     </div>
     
@@ -64,27 +91,10 @@
         <a onclick="showScreen('stats-screen')">STATISTICS</a>
         <a onclick="showSettings()">SETTINGS</a>
     </div>
-</div>
-
-<!-- ===== DIFFICULTY MODAL ===== -->
-<div class="difficulty-modal hidden" id="difficulty-modal">
-    <div class="difficulty-content">
-        <h3 id="diff-modal-title">SELECT DIFFICULTY</h3>
-        <div class="difficulty-options">
-            <div class="diff-card" onclick="selectDifficulty('easy')">
-                <div class="diff-level">EASY</div>
-                <div class="diff-desc">Baseline · Clean</div>
-            </div>
-            <div class="diff-card" onclick="selectDifficulty('medium')">
-                <div class="diff-level">MEDIUM</div>
-                <div class="diff-desc">Visual Crowding</div>
-            </div>
-            <div class="diff-card" onclick="selectDifficulty('hard')">
-                <div class="diff-level">HARD</div>
-                <div class="diff-desc">Neural Limit · Strobe</div>
-            </div>
-        </div>
-        <button class="diff-cancel" onclick="hideDifficultyModal()">CANCEL</button>
+    
+    <div class="adaptive-info">
+        <span class="adaptive-icon">⚡</span>
+        <span>ADAPTIVE DIFFICULTY: Training auto-adjusts to your skill level (i+1 principle)</span>
     </div>
 </div>
 
@@ -97,49 +107,104 @@
 <div class="settings-modal hidden" id="settings-modal">
     <div class="settings-content">
         <h2>SETTINGS</h2>
+        
         <div class="settings-section">
-            <h3>MOUSE SENSITIVITY</h3>
+            <h3>STROBE MODE (Per Mode)</h3>
+            <p class="settings-desc">Enable temporal occlusion training for each mode</p>
+            <div class="strobe-toggles">
+                <div class="strobe-toggle-row">
+                    <span>01: Gabor Scout</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-1" onchange="toggleModeStrobe(1, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>02: Pure Tracking</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-2" onchange="toggleModeStrobe(2, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>03: Surgical Lock</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-3" onchange="toggleModeStrobe(3, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>04: Landolt Saccade</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-4" onchange="toggleModeStrobe(4, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>05: Parafoveal Ghost</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-5" onchange="toggleModeStrobe(5, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>06: Memory Sequencer</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-6" onchange="toggleModeStrobe(6, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="strobe-toggle-row">
+                    <span>07: Cognitive Switch</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="strobe-mode-7" onchange="toggleModeStrobe(7, this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h3>MOUSE</h3>
             <div class="setting-row">
-                <div><label>Sensitivity Multiplier</label></div>
+                <label>Sensitivity Multiplier</label>
                 <div class="scale-control">
                     <input type="range" class="scale-slider" id="setting-sensitivity" min="0.5" max="3" step="0.1" value="1" oninput="updateSensitivity(this.value)">
                     <span class="scale-value" id="sens-value">1.0x</span>
                 </div>
             </div>
         </div>
-        <div class="settings-section">
-            <h3>MODE CONFIG</h3>
-            <div class="setting-row">
-                <div><label>Adaptive Contrast (Mode 1)</label></div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-adaptiveContrast" onchange="updateSetting('adaptiveContrast', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </div>
+        
         <div class="settings-section">
             <h3>AUDIO</h3>
             <div class="setting-row">
-                <div><label>Sound Effects</label></div>
+                <label>Sound Effects</label>
                 <label class="toggle-switch">
                     <input type="checkbox" id="setting-soundEnabled" onchange="updateSetting('soundEnabled', this.checked); if(this.checked) initAudio();">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
             <div class="setting-row">
-                <div><label>Volume</label></div>
+                <label>Volume</label>
                 <div class="scale-control">
                     <input type="range" class="scale-slider" id="setting-volume" min="0" max="1" step="0.05" value="0.5" oninput="updateVolume(this.value)">
                     <span class="scale-value" id="volume-value">50%</span>
                 </div>
             </div>
         </div>
+        
         <div class="settings-section">
             <h3>CROSSHAIR</h3>
             <div class="crosshair-grid">
-                <div class="crosshair-option" onclick="setCrosshair('cross')" data-ch="cross"><svg viewBox="0 0 32 32"><line x1="6" y1="16" x2="12" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="20" y1="16" x2="26" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="6" x2="16" y2="12" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="20" x2="16" y2="26" stroke="#00d9ff" stroke-width="1.5"/></svg></div>
-                <div class="crosshair-option" onclick="setCrosshair('dot')" data-ch="dot"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="3" fill="#00d9ff"/></svg></div>
-                <div class="crosshair-option" onclick="setCrosshair('circle')" data-ch="circle"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="#00d9ff" stroke-width="1.5"/><circle cx="16" cy="16" r="2" fill="#00d9ff"/></svg></div>
+                <div class="crosshair-option" onclick="setCrosshair('cross')" data-ch="cross">
+                    <svg viewBox="0 0 32 32"><line x1="6" y1="16" x2="12" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="20" y1="16" x2="26" y2="16" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="6" x2="16" y2="12" stroke="#00d9ff" stroke-width="1.5"/><line x1="16" y1="20" x2="16" y2="26" stroke="#00d9ff" stroke-width="1.5"/></svg>
+                </div>
+                <div class="crosshair-option" onclick="setCrosshair('dot')" data-ch="dot">
+                    <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="3" fill="#00d9ff"/></svg>
+                </div>
+                <div class="crosshair-option" onclick="setCrosshair('circle')" data-ch="circle">
+                    <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="#00d9ff" stroke-width="1.5"/><circle cx="16" cy="16" r="2" fill="#00d9ff"/></svg>
+                </div>
             </div>
             <div class="setting-row">
                 <label>Scale</label>
@@ -150,6 +215,7 @@
             </div>
             <div class="crosshair-preview"><canvas id="crosshair-preview-canvas"></canvas></div>
         </div>
+        
         <div class="settings-actions">
             <button onclick="resetSettings()">RESET</button>
             <button class="primary" onclick="closeSettings()">SAVE & CLOSE</button>
@@ -162,8 +228,9 @@
     <canvas id="game-canvas"></canvas>
     <div class="game-hud">
         <div class="hud-item"><div class="label">TIME</div><div class="value time" id="hud-time">60</div></div>
-        <div class="hud-item"><div class="label">SCORE</div><div class="value score" id="hud-score">0</div></div>
+        <div class="hud-item"><div class="label">TRIALS</div><div class="value trials" id="hud-trials">0</div></div>
         <div class="hud-item"><div class="label">ACCURACY</div><div class="value accuracy" id="hud-accuracy">--%</div></div>
+        <div class="hud-item"><div class="label">DIFFICULTY</div><div class="value difficulty" id="hud-difficulty">30%</div></div>
     </div>
     <div class="escape-hint">[ESC] PAUSE</div>
     <div class="countdown-overlay" id="countdown-overlay">
@@ -182,58 +249,80 @@
 
 <!-- ===== RESULT SCREEN ===== -->
 <div id="result-screen" class="screen">
-    <div class="result-header"><h2>SESSION COMPLETE</h2></div>
-    <div class="result-score"><div class="big-score" id="result-score">0</div><div class="score-label">TOTAL SCORE</div></div>
-    <div class="result-stats">
-        <div class="result-stat"><div class="val" id="result-hits">0</div><div class="lbl">HITS</div></div>
-        <div class="result-stat"><div class="val" id="result-misses">0</div><div class="lbl">MISSES</div></div>
-        <div class="result-stat"><div class="val" id="result-accuracy">0%</div><div class="lbl">ACCURACY</div></div>
-        <div class="result-stat"><div class="val" id="result-avgrt">--</div><div class="lbl">AVG RT (MS)</div></div>
+    <div class="result-header">
+        <h2>SESSION COMPLETE</h2>
+        <div class="result-mode-info">
+            <span id="result-mode">Mode Name</span>
+            <span id="result-strobe" class="strobe-badge">NORMAL</span>
+        </div>
     </div>
-    <div class="result-actions"><button onclick="showScreen('menu-screen')">MENU</button><button class="primary" onclick="restartGame()">AGAIN</button></div>
+    
+    <div class="result-main">
+        <div class="result-stat-big">
+            <div class="big-value" id="result-accuracy">0%</div>
+            <div class="big-label">ACCURACY</div>
+        </div>
+        <div class="result-stat-big">
+            <div class="big-value" id="result-avgrt">0ms</div>
+            <div class="big-label">AVG REACTION</div>
+        </div>
+    </div>
+    
+    <div class="result-stats">
+        <div class="result-stat">
+            <div class="val" id="result-trials">0/0</div>
+            <div class="lbl">HITS / TRIALS</div>
+        </div>
+        <div class="result-stat difficulty-stat">
+            <div class="val" id="result-difficulty">30%</div>
+            <div class="diff-change" id="result-diff-change">+0%</div>
+            <div class="lbl">FINAL DIFFICULTY</div>
+        </div>
+        <div class="result-stat">
+            <div class="val" id="result-minrt">0ms</div>
+            <div class="lbl">BEST RT</div>
+        </div>
+        <div class="result-stat">
+            <div class="val" id="result-maxrt">0ms</div>
+            <div class="lbl">WORST RT</div>
+        </div>
+        <div class="result-stat">
+            <div class="val" id="result-consistency">±0ms</div>
+            <div class="lbl">CONSISTENCY</div>
+        </div>
+    </div>
+    
+    <div class="result-actions">
+        <button onclick="showScreen('menu-screen')">MENU</button>
+        <button class="primary" onclick="restartGame()">AGAIN</button>
+    </div>
 </div>
 
 <!-- ===== STATS SCREEN ===== -->
 <div id="stats-screen" class="screen">
     <div class="stats-header">
-        <h2>ANALYTICS</h2>
+        <h2>TRAINING ANALYTICS</h2>
         <button class="back-btn" onclick="showScreen('menu-screen')">← BACK</button>
     </div>
-    <!-- Content populated by stats.js -->
 </div>
 
 <!-- FLASH EFFECTS -->
 <div class="flash-overlay penalty" id="flash-penalty"></div>
 <div class="flash-overlay warn" id="flash-warn"></div>
 <div class="flash-text penalty" id="flash-text-penalty">INVALID</div>
-<div class="flash-text warn" id="flash-text-warn">BROKE GAZE</div>
+<div class="flash-text warn" id="flash-text-warn">MISSED</div>
 
 <script src="js/config.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/data.js"></script>
+<script src="js/stats.js"></script>
 <script src="js/noise.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/game-modes.js"></script>
 <script src="js/game-engine.js"></script>
-<script src="js/stats.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 
-<script>
-let selectedModeForDifficulty = 1;
-function showDifficultyModal(mode) {
-    selectedModeForDifficulty = mode;
-    const m = document.getElementById('difficulty-modal');
-    if(m) m.classList.remove('hidden');
-}
-function hideDifficultyModal() {
-    const m = document.getElementById('difficulty-modal');
-    if(m) m.classList.add('hidden');
-}
-function selectDifficulty(diff) {
-    startGame(selectedModeForDifficulty, diff);
-}
-</script>
 </body>
 </html>

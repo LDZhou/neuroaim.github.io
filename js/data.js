@@ -1,77 +1,18 @@
 // ==================== DATA MANAGEMENT ====================
-// Session storage and retrieval
-
-const STORAGE_KEY = 'neuroaim_v5_data';
-
-function loadData() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch(e) {
-        console.warn('Failed to load data:', e);
-    }
-    return { 
-        mode1: [], 
-        mode2_easy: [], 
-        mode2_medium: [], 
-        mode2_hard: [],
-        mode3: []
-    };
-}
-
-function saveData(data) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch(e) {
-        console.warn('Failed to save data:', e);
-    }
-}
-
-function addSession(mode, difficulty, session) {
-    const data = loadData();
-    let key;
-    
-    if (mode === 1) {
-        key = 'mode1';
-    } else if (mode === 2) {
-        key = 'mode2_' + difficulty;
-    } else if (mode === 3) {
-        key = 'mode3';
-    }
-    
-    // Ensure key exists (migration support)
-    if (!data[key]) data[key] = [];
-    
-    data[key].push({
-        ...session,
-        timestamp: Date.now(),
-        difficulty: mode === 2 ? difficulty : null
-    });
-    
-    // Keep last 100 sessions per category
-    if (data[key].length > 100) {
-        data[key] = data[key].slice(-100);
-    }
-    
-    saveData(data);
-}
-
-function getSessionsForMode(modeKey) {
-    const data = loadData();
-    return data[modeKey] || [];
-}
-
-function clearAllData() {
-    if (confirm('Are you sure you want to clear ALL training data? This cannot be undone.')) {
-        localStorage.removeItem(STORAGE_KEY);
-        return true;
-    }
-    return false;
-}
+// Export, import, and data utilities
 
 function exportData() {
-    const data = loadData();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const stats = loadStats();
+    const settings_data = JSON.parse(localStorage.getItem('neuroaim_settings_v3') || '{}');
+    
+    const exportObj = {
+        version: 3,
+        exportDate: new Date().toISOString(),
+        stats: stats,
+        settings: settings_data
+    };
+    
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -86,7 +27,14 @@ function importData(file) {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                saveData(data);
+                
+                if (data.stats) {
+                    localStorage.setItem('neuroaim_stats_v3', JSON.stringify(data.stats));
+                }
+                if (data.settings) {
+                    localStorage.setItem('neuroaim_settings_v3', JSON.stringify(data.settings));
+                }
+                
                 resolve(true);
             } catch(err) {
                 reject(err);
@@ -95,4 +43,23 @@ function importData(file) {
         reader.onerror = reject;
         reader.readAsText(file);
     });
+}
+
+function getDataSummary() {
+    const stats = loadStats();
+    const totalSessions = stats.length;
+    const modes = {};
+    
+    stats.forEach(s => {
+        if (!modes[s.mode]) modes[s.mode] = { normal: 0, strobe: 0 };
+        if (s.strobe) modes[s.mode].strobe++;
+        else modes[s.mode].normal++;
+    });
+    
+    return {
+        totalSessions,
+        byMode: modes,
+        oldestSession: stats.length > 0 ? new Date(stats[0].timestamp) : null,
+        newestSession: stats.length > 0 ? new Date(stats[stats.length - 1].timestamp) : null
+    };
 }

@@ -1,8 +1,8 @@
 // ==================== STATS MODULE ====================
-// Comprehensive FPS-focused statistics with progress tracking
-// FULLY REWRITTEN for detailed analytics
+// Pure statistics tracking - no scoring
+// Separate strobe/non-strobe statistics
 
-const STATS_KEY = 'neuroaim_stats_v2';
+const STATS_KEY = 'neuroaim_stats_v3';
 
 // ===== DATA PERSISTENCE =====
 function loadStats() {
@@ -10,7 +10,7 @@ function loadStats() {
         const data = localStorage.getItem(STATS_KEY);
         return data ? JSON.parse(data) : [];
     } catch (e) {
-        console.warn("Stats load failed, resetting:", e);
+        console.warn("Stats load failed:", e);
         return [];
     }
 }
@@ -27,33 +27,60 @@ function saveGameStats(session) {
     }
 }
 
-// ===== STATS CALCULATION HELPERS =====
-function filterByModeAndDifficulty(stats, mode, difficulty = null) {
+// ===== MODE METADATA =====
+const MODE_NAMES = {
+    1: 'Gabor Scout',
+    2: 'Pure Tracking',
+    3: 'Surgical Lock',
+    4: 'Landolt Saccade',
+    5: 'Parafoveal Ghost',
+    6: 'Memory Sequencer',
+    7: 'Cognitive Switch'
+};
+
+const MODE_COLORS = {
+    1: '#00d9ff',
+    2: '#00ff99',
+    3: '#ff3366',
+    4: '#ffcc00',
+    5: '#9966ff',
+    6: '#ff66cc',
+    7: '#66ffcc'
+};
+
+const MODE_METRICS = {
+    1: { primary: 'avgRt', secondary: 'accuracy', name: 'Target Acquisition' },
+    2: { primary: 'accuracy', secondary: 'gazeBreaks', name: 'Tracking Stability' },
+    3: { primary: 'accuracy', secondary: 'avgRt', name: 'Precision Control' },
+    4: { primary: 'avgRt', secondary: 'accuracy', name: 'Saccadic Speed' },
+    5: { primary: 'accuracy', secondary: 'inhibitionSuccess', name: 'Peripheral Awareness' },
+    6: { primary: 'accuracy', secondary: 'sequenceErrors', name: 'Spatial Memory' },
+    7: { primary: 'accuracy', secondary: 'switchErrors', name: 'Cognitive Flexibility' }
+};
+
+// ===== CALCULATION HELPERS =====
+function filterSessions(stats, mode, strobe = null) {
     return stats.filter(s => {
         if (s.mode !== mode) return false;
-        if (difficulty && s.difficulty !== difficulty) return false;
+        if (strobe !== null && s.strobe !== strobe) return false;
         return true;
     });
 }
 
-function getRecentSessions(sessions, count = 10) {
-    return sessions.slice(-count);
+function calculateAvg(arr, key) {
+    const valid = arr.filter(s => s[key] !== undefined && s[key] !== null);
+    if (valid.length === 0) return 0;
+    return Math.round(valid.reduce((a, b) => a + b[key], 0) / valid.length);
 }
 
-function calculateAverage(arr, key) {
-    if (arr.length === 0) return 0;
-    const sum = arr.reduce((a, b) => a + (b[key] || 0), 0);
-    return Math.round(sum / arr.length);
-}
-
-function calculateTrend(sessions, key, recentCount = 5) {
-    if (sessions.length < recentCount * 2) return { trend: 'neutral', change: 0 };
+function calculateTrend(sessions, key, windowSize = 5) {
+    if (sessions.length < windowSize * 2) return { trend: 'neutral', change: 0 };
     
-    const recent = sessions.slice(-recentCount);
-    const previous = sessions.slice(-recentCount * 2, -recentCount);
+    const recent = sessions.slice(-windowSize);
+    const previous = sessions.slice(-windowSize * 2, -windowSize);
     
-    const recentAvg = calculateAverage(recent, key);
-    const previousAvg = calculateAverage(previous, key);
+    const recentAvg = calculateAvg(recent, key);
+    const previousAvg = calculateAvg(previous, key);
     
     if (previousAvg === 0) return { trend: 'neutral', change: 0 };
     
@@ -64,68 +91,24 @@ function calculateTrend(sessions, key, recentCount = 5) {
     return { trend: 'neutral', change };
 }
 
-function getPercentile(value, allValues) {
-    if (allValues.length === 0) return 0;
-    const sorted = [...allValues].sort((a, b) => a - b);
-    const index = sorted.findIndex(v => v >= value);
-    return Math.round((index / sorted.length) * 100);
+function getDifficultyProgression(sessions) {
+    if (sessions.length < 2) return { start: 0.3, end: 0.3, change: 0 };
+    
+    const first = sessions[0];
+    const last = sessions[sessions.length - 1];
+    
+    return {
+        start: first.startDifficulty || 0.3,
+        end: last.endDifficulty || 0.3,
+        change: (last.endDifficulty || 0.3) - (first.startDifficulty || 0.3)
+    };
 }
 
-// ===== MODE NAMES & COLORS =====
-const MODE_NAMES = {
-    1: 'Gabor Scout',
-    2: 'Pure Tracking',
-    3: 'Surgical Lock',
-    4: 'Landolt Saccade'
-};
-
-const MODE_COLORS = {
-    1: '#00d9ff',
-    2: '#00ff99',
-    3: '#ff3366',
-    4: '#ffcc00'
-};
-
-const DIFFICULTY_COLORS = {
-    easy: '#00ff99',
-    medium: '#ffcc00',
-    hard: '#ff3366'
-};
-
-// ===== FPS SKILL METRICS =====
-const FPS_METRICS = {
-    1: { // Gabor Scout
-        primary: 'avgRt',
-        secondary: 'accuracy',
-        name: 'Target Acquisition',
-        description: 'Measures reaction speed and visual filtering ability'
-    },
-    2: { // Pure Tracking
-        primary: 'accuracy',
-        secondary: 'gazeBreaks',
-        name: 'Tracking Stability',
-        description: 'Measures smooth pursuit and post-shot discipline'
-    },
-    3: { // Surgical Lock
-        primary: 'accuracy',
-        secondary: 'avgRt',
-        name: 'Precision Control',
-        description: 'Measures fine motor control and target discrimination'
-    },
-    4: { // Landolt Saccade
-        primary: 'avgRt',
-        secondary: 'accuracy',
-        name: 'Saccadic Speed',
-        description: 'Measures eye-hand coordination and foveal acquisition'
-    }
-};
-
-// ===== MAIN DISPLAY FUNCTION =====
+// ===== MAIN DISPLAY =====
 function updateStatsDisplay() {
     const stats = loadStats();
     const container = document.getElementById('stats-screen');
     
-    // Preserve header
     const header = container.querySelector('.stats-header');
     container.innerHTML = '';
     container.appendChild(header);
@@ -135,44 +118,38 @@ function updateStatsDisplay() {
             <div class="no-data-message">
                 <div class="no-data-icon">📊</div>
                 <h3>NO TRAINING DATA</h3>
-                <p>Complete some training sessions to see your statistics.</p>
+                <p>Complete training sessions to see statistics.</p>
             </div>
         `;
         return;
     }
     
-    // Create main stats layout
     const mainContent = document.createElement('div');
     mainContent.className = 'stats-main-content';
     
-    // Overall Summary Section
+    // Summary cards
     mainContent.innerHTML += createOverallSummary(stats);
     
-    // Mode Tabs
+    // Mode tabs
     mainContent.innerHTML += `
         <div class="stats-mode-tabs">
             <button class="mode-tab active" data-mode="all" onclick="switchStatsTab('all')">OVERVIEW</button>
-            <button class="mode-tab" data-mode="1" onclick="switchStatsTab(1)">MODE 1: GABOR</button>
-            <button class="mode-tab" data-mode="2" onclick="switchStatsTab(2)">MODE 2: TRACKING</button>
-            <button class="mode-tab" data-mode="3" onclick="switchStatsTab(3)">MODE 3: SURGICAL</button>
-            <button class="mode-tab" data-mode="4" onclick="switchStatsTab(4)">MODE 4: LANDOLT</button>
+            ${[1,2,3,4,5,6,7].map(m => `
+                <button class="mode-tab" data-mode="${m}" onclick="switchStatsTab(${m})">${m}: ${MODE_NAMES[m].split(' ')[0].toUpperCase()}</button>
+            `).join('')}
         </div>
+        <div id="stats-tab-content"></div>
     `;
     
-    // Tab Content Container
-    mainContent.innerHTML += `<div id="stats-tab-content"></div>`;
-    
     container.appendChild(mainContent);
-    
-    // Show overview by default
     switchStatsTab('all');
     
-    // Add clear data button
+    // Clear button
     const clearBtn = document.createElement('button');
     clearBtn.className = 'clear-data-btn';
     clearBtn.innerText = "CLEAR ALL DATA";
     clearBtn.onclick = () => {
-        if(confirm('Delete all training history? This cannot be undone.')) {
+        if(confirm('Delete all training history? Cannot be undone.')) {
             localStorage.removeItem(STATS_KEY);
             updateStatsDisplay();
         }
@@ -180,9 +157,7 @@ function updateStatsDisplay() {
     container.appendChild(clearBtn);
 }
 
-// ===== TAB SWITCHING =====
 window.switchStatsTab = function(mode) {
-    // Update active tab
     document.querySelectorAll('.mode-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.mode == mode);
     });
@@ -200,18 +175,13 @@ window.switchStatsTab = function(mode) {
 // ===== OVERALL SUMMARY =====
 function createOverallSummary(stats) {
     const totalSessions = stats.length;
-    const totalTime = Math.round(totalSessions * 55 / 60); // Approximate minutes
-    const avgAccuracy = calculateAverage(stats, 'accuracy');
-    const avgRt = calculateAverage(stats, 'avgRt');
+    const totalTime = Math.round(totalSessions * CFG.sessionDuration / 60);
+    const avgAccuracy = calculateAvg(stats, 'accuracy');
+    const avgRt = calculateAvg(stats, 'avgRt');
+    const strobeSessions = stats.filter(s => s.strobe).length;
     
-    // Best scores per mode
-    const bestScores = {};
-    [1, 2, 3, 4].forEach(mode => {
-        const modeSessions = filterByModeAndDifficulty(stats, mode);
-        bestScores[mode] = modeSessions.length > 0 
-            ? Math.max(...modeSessions.map(s => s.score))
-            : 0;
-    });
+    // Overall difficulty progression
+    const avgEndDiff = calculateAvg(stats, 'endDifficulty');
     
     return `
         <div class="stats-summary-grid">
@@ -229,7 +199,15 @@ function createOverallSummary(stats) {
             </div>
             <div class="summary-card yellow">
                 <div class="summary-value">${avgRt}ms</div>
-                <div class="summary-label">AVG REACTION</div>
+                <div class="summary-label">AVG RT</div>
+            </div>
+            <div class="summary-card cyan">
+                <div class="summary-value">${Math.round(avgEndDiff * 100)}%</div>
+                <div class="summary-label">AVG DIFFICULTY</div>
+            </div>
+            <div class="summary-card purple">
+                <div class="summary-value">${strobeSessions}</div>
+                <div class="summary-label">STROBE SESSIONS</div>
             </div>
         </div>
     `;
@@ -239,49 +217,50 @@ function createOverallSummary(stats) {
 function createOverviewContent(stats) {
     let html = '<div class="stats-overview">';
     
-    // Mode Performance Cards
     html += '<h3 class="section-title">PERFORMANCE BY MODE</h3>';
     html += '<div class="mode-performance-grid">';
     
-    [1, 2, 3, 4].forEach(mode => {
-        const modeSessions = filterByModeAndDifficulty(stats, mode);
+    [1, 2, 3, 4, 5, 6, 7].forEach(mode => {
+        const modeSessions = filterSessions(stats, mode);
         const color = MODE_COLORS[mode];
         const name = MODE_NAMES[mode];
         
         if (modeSessions.length === 0) {
             html += `
-                <div class="mode-perf-card" style="border-color: ${color}20">
+                <div class="mode-perf-card" style="border-color: ${color}30">
                     <div class="mode-perf-header" style="color: ${color}">${name}</div>
-                    <div class="mode-perf-empty">No data yet</div>
+                    <div class="mode-perf-empty">No data</div>
                 </div>
             `;
             return;
         }
         
-        const avgScore = calculateAverage(modeSessions, 'score');
-        const avgAcc = calculateAverage(modeSessions, 'accuracy');
-        const avgRt = calculateAverage(modeSessions, 'avgRt');
-        const trend = calculateTrend(modeSessions, 'score');
+        const normalSessions = filterSessions(stats, mode, false);
+        const strobeSessions = filterSessions(stats, mode, true);
+        const avgAcc = calculateAvg(modeSessions, 'accuracy');
+        const avgRt = calculateAvg(modeSessions, 'avgRt');
+        const avgDiff = calculateAvg(modeSessions, 'endDifficulty');
+        const trend = calculateTrend(modeSessions, 'accuracy');
         
         html += `
             <div class="mode-perf-card" style="border-color: ${color}">
                 <div class="mode-perf-header" style="color: ${color}">${name}</div>
                 <div class="mode-perf-stats">
                     <div class="perf-stat">
-                        <span class="perf-value">${avgScore}</span>
-                        <span class="perf-label">AVG SCORE</span>
-                    </div>
-                    <div class="perf-stat">
                         <span class="perf-value">${avgAcc}%</span>
                         <span class="perf-label">ACCURACY</span>
                     </div>
                     <div class="perf-stat">
                         <span class="perf-value">${avgRt}ms</span>
-                        <span class="perf-label">REACT</span>
+                        <span class="perf-label">AVG RT</span>
+                    </div>
+                    <div class="perf-stat">
+                        <span class="perf-value">${Math.round(avgDiff * 100)}%</span>
+                        <span class="perf-label">DIFFICULTY</span>
                     </div>
                 </div>
                 <div class="mode-perf-footer">
-                    <span>${modeSessions.length} sessions</span>
+                    <span>${normalSessions.length} / ${strobeSessions.length} <small>(N/S)</small></span>
                     <span class="trend ${trend.trend}">${trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→'} ${Math.abs(trend.change)}%</span>
                 </div>
             </div>
@@ -290,9 +269,9 @@ function createOverviewContent(stats) {
     
     html += '</div>';
     
-    // Recent Sessions Table
+    // Recent sessions
     html += '<h3 class="section-title">RECENT SESSIONS</h3>';
-    html += createRecentSessionsTable(stats.slice(-15).reverse());
+    html += createSessionsTable(stats.slice(-15).reverse());
     
     html += '</div>';
     return html;
@@ -300,99 +279,79 @@ function createOverviewContent(stats) {
 
 // ===== MODE DETAIL TAB =====
 function createModeDetailContent(stats, mode) {
-    const modeSessions = filterByModeAndDifficulty(stats, mode);
+    const modeSessions = filterSessions(stats, mode);
+    const normalSessions = filterSessions(stats, mode, false);
+    const strobeSessions = filterSessions(stats, mode, true);
     const color = MODE_COLORS[mode];
     const name = MODE_NAMES[mode];
-    const metric = FPS_METRICS[mode];
+    const metric = MODE_METRICS[mode];
     
     if (modeSessions.length === 0) {
         return `
             <div class="mode-detail-empty">
                 <h3 style="color: ${color}">${name}</h3>
-                <p>Complete some sessions in this mode to see detailed statistics.</p>
+                <p>Complete sessions in this mode to see statistics.</p>
             </div>
         `;
     }
     
     let html = `<div class="mode-detail" style="--mode-color: ${color}">`;
     
-    // Mode Header
     html += `
         <div class="mode-detail-header">
             <h3 style="color: ${color}">${name}</h3>
-            <p class="mode-description">${metric.description}</p>
+            <p class="mode-description">${metric.name} Training</p>
         </div>
     `;
     
-    // Difficulty Breakdown
-    html += '<h4 class="subsection-title">PERFORMANCE BY DIFFICULTY</h4>';
-    html += '<div class="difficulty-breakdown">';
+    // Strobe vs Normal comparison
+    html += '<h4 class="subsection-title">NORMAL vs STROBE</h4>';
+    html += '<div class="strobe-comparison">';
     
-    ['easy', 'medium', 'hard'].forEach(diff => {
-        const diffSessions = filterByModeAndDifficulty(stats, mode, diff);
-        const diffColor = DIFFICULTY_COLORS[diff];
-        
-        if (diffSessions.length === 0) {
+    [{ label: 'NORMAL', sessions: normalSessions, strobe: false }, 
+     { label: 'STROBE', sessions: strobeSessions, strobe: true }].forEach(({ label, sessions, strobe }) => {
+        if (sessions.length === 0) {
             html += `
-                <div class="diff-card empty">
-                    <div class="diff-header" style="color: ${diffColor}">${diff.toUpperCase()}</div>
-                    <div class="diff-empty">No data</div>
+                <div class="strobe-card ${strobe ? 'strobe' : ''}">
+                    <div class="strobe-header">${label}</div>
+                    <div class="strobe-empty">No data</div>
                 </div>
             `;
             return;
         }
         
-        const best = Math.max(...diffSessions.map(s => s.score));
-        const avg = calculateAverage(diffSessions, 'score');
-        const avgAcc = calculateAverage(diffSessions, 'accuracy');
-        const avgRt = calculateAverage(diffSessions, 'avgRt');
-        const recent = getRecentSessions(diffSessions, 5);
-        const recentAvg = calculateAverage(recent, 'score');
-        const trend = calculateTrend(diffSessions, 'score');
-        
-        // Additional mode-specific stats
-        let extraStats = '';
-        if (mode === 2) {
-            const avgGazeBreaks = calculateAverage(diffSessions.filter(s => s.gazeBreaks !== undefined), 'gazeBreaks');
-            extraStats = `<div class="diff-stat"><span class="stat-value">${avgGazeBreaks}</span><span class="stat-label">Gaze Breaks</span></div>`;
-        }
-        if (mode === 3 || mode === 4) {
-            const minRt = Math.min(...diffSessions.filter(s => s.minRt).map(s => s.minRt));
-            if (minRt && minRt !== Infinity) {
-                extraStats = `<div class="diff-stat"><span class="stat-value">${minRt}ms</span><span class="stat-label">Best RT</span></div>`;
-            }
-        }
+        const avgAcc = calculateAvg(sessions, 'accuracy');
+        const avgRt = calculateAvg(sessions, 'avgRt');
+        const avgDiff = calculateAvg(sessions, 'endDifficulty');
+        const bestDiff = Math.max(...sessions.map(s => s.endDifficulty || 0));
+        const progression = getDifficultyProgression(sessions);
         
         html += `
-            <div class="diff-card" style="border-color: ${diffColor}">
-                <div class="diff-header" style="color: ${diffColor}">${diff.toUpperCase()}</div>
-                <div class="diff-best">
-                    <span class="best-label">BEST</span>
-                    <span class="best-value">${best}</span>
-                </div>
-                <div class="diff-stats">
-                    <div class="diff-stat">
-                        <span class="stat-value">${avg}</span>
-                        <span class="stat-label">Avg Score</span>
-                    </div>
-                    <div class="diff-stat">
+            <div class="strobe-card ${strobe ? 'strobe' : ''}">
+                <div class="strobe-header">${label} <span class="session-count">(${sessions.length} sessions)</span></div>
+                <div class="strobe-stats">
+                    <div class="strobe-stat">
                         <span class="stat-value">${avgAcc}%</span>
                         <span class="stat-label">Accuracy</span>
                     </div>
-                    <div class="diff-stat">
+                    <div class="strobe-stat">
                         <span class="stat-value">${avgRt}ms</span>
                         <span class="stat-label">Avg RT</span>
                     </div>
-                    ${extraStats}
+                    <div class="strobe-stat">
+                        <span class="stat-value">${Math.round(avgDiff * 100)}%</span>
+                        <span class="stat-label">Avg Diff</span>
+                    </div>
+                    <div class="strobe-stat highlight">
+                        <span class="stat-value">${Math.round(bestDiff * 100)}%</span>
+                        <span class="stat-label">Peak Diff</span>
+                    </div>
                 </div>
-                <div class="diff-progress">
-                    <div class="progress-row">
-                        <span>Sessions: ${diffSessions.length}</span>
-                        <span class="trend ${trend.trend}">${trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→'} ${Math.abs(trend.change)}%</span>
-                    </div>
-                    <div class="progress-row">
-                        <span>Recent Avg: ${recentAvg}</span>
-                    </div>
+                <div class="strobe-progress">
+                    <span>Progression: ${Math.round(progression.start * 100)}% → ${Math.round(progression.end * 100)}%</span>
+                    <span class="${progression.change > 0 ? 'positive' : progression.change < 0 ? 'negative' : ''}">
+                        ${progression.change > 0 ? '+' : ''}${Math.round(progression.change * 100)}%
+                    </span>
                 </div>
             </div>
         `;
@@ -400,141 +359,156 @@ function createModeDetailContent(stats, mode) {
     
     html += '</div>';
     
-    // Progress Chart
-    html += '<h4 class="subsection-title">SCORE PROGRESSION</h4>';
-    html += createProgressChart(modeSessions, mode);
+    // Difficulty progression chart
+    html += '<h4 class="subsection-title">DIFFICULTY PROGRESSION</h4>';
+    html += createDifficultyChart(modeSessions, mode);
     
-    // Consistency Analysis
-    html += '<h4 class="subsection-title">CONSISTENCY ANALYSIS</h4>';
-    html += createConsistencyAnalysis(modeSessions, mode);
+    // Mode-specific stats
+    html += '<h4 class="subsection-title">MODE-SPECIFIC METRICS</h4>';
+    html += createModeSpecificStats(modeSessions, mode);
     
-    // Recent Sessions for this mode
+    // Recent sessions for this mode
     html += '<h4 class="subsection-title">RECENT SESSIONS</h4>';
-    html += createRecentSessionsTable(modeSessions.slice(-10).reverse(), true);
+    html += createSessionsTable(modeSessions.slice(-10).reverse(), true);
     
     html += '</div>';
     return html;
 }
 
-// ===== PROGRESS CHART =====
-function createProgressChart(sessions, mode) {
+// ===== DIFFICULTY CHART =====
+function createDifficultyChart(sessions, mode) {
     if (sessions.length < 2) {
         return '<div class="chart-placeholder">Need more sessions for chart</div>';
     }
     
     const color = MODE_COLORS[mode];
-    const maxScore = Math.max(...sessions.map(s => s.score));
-    const minScore = Math.min(...sessions.map(s => s.score));
-    const range = maxScore - minScore || 1;
-    
-    // Take last 20 sessions for chart
-    const chartSessions = sessions.slice(-20);
+    const chartSessions = sessions.slice(-30);
     const width = 100 / chartSessions.length;
     
     let bars = '';
     chartSessions.forEach((s, i) => {
-        const height = ((s.score - minScore) / range) * 80 + 10;
-        const diffColor = DIFFICULTY_COLORS[s.difficulty] || color;
+        const diff = s.endDifficulty || 0.3;
+        const height = diff * 90 + 5;
+        const barColor = s.strobe ? '#ff66cc' : color;
         bars += `
-            <div class="chart-bar" style="width: ${width}%; height: ${height}%; background: ${diffColor}" 
-                 title="${s.score} pts (${s.difficulty})"></div>
+            <div class="chart-bar" style="width: ${width}%; height: ${height}%; background: ${barColor}" 
+                 title="${Math.round(diff * 100)}% (${s.strobe ? 'Strobe' : 'Normal'})"></div>
         `;
     });
     
     return `
         <div class="progress-chart">
             <div class="chart-y-axis">
-                <span>${maxScore}</span>
-                <span>${Math.round((maxScore + minScore) / 2)}</span>
-                <span>${minScore}</span>
+                <span>100%</span>
+                <span>50%</span>
+                <span>0%</span>
             </div>
             <div class="chart-bars">${bars}</div>
-            <div class="chart-x-label">← Older | Newer →</div>
+            <div class="chart-legend">
+                <span><span class="legend-dot" style="background: ${color}"></span> Normal</span>
+                <span><span class="legend-dot" style="background: #ff66cc"></span> Strobe</span>
+            </div>
         </div>
     `;
 }
 
-// ===== CONSISTENCY ANALYSIS =====
-function createConsistencyAnalysis(sessions, mode) {
-    if (sessions.length < 5) {
-        return '<div class="analysis-placeholder">Need at least 5 sessions for analysis</div>';
+// ===== MODE SPECIFIC STATS =====
+function createModeSpecificStats(sessions, mode) {
+    let html = '<div class="mode-specific-grid">';
+    
+    switch(mode) {
+        case 2: // Tracking
+            const avgGaze = calculateAvg(sessions.filter(s => s.gazeBreaks !== undefined), 'gazeBreaks');
+            html += `
+                <div class="specific-stat">
+                    <span class="stat-value">${avgGaze}</span>
+                    <span class="stat-label">Avg Gaze Breaks</span>
+                </div>
+            `;
+            break;
+        case 3: // Surgical
+            const perfectTrials = sessions.reduce((a, s) => a + (s.perfectTrials || 0), 0);
+            html += `
+                <div class="specific-stat">
+                    <span class="stat-value">${perfectTrials}</span>
+                    <span class="stat-label">Perfect Core Hits</span>
+                </div>
+            `;
+            break;
+        case 5: // Parafoveal
+            const inhibSuccess = sessions.reduce((a, s) => a + (s.inhibitionSuccess || 0), 0);
+            const inhibFail = sessions.reduce((a, s) => a + (s.inhibitionFail || 0), 0);
+            const inhibRate = inhibSuccess + inhibFail > 0 ? Math.round(inhibSuccess / (inhibSuccess + inhibFail) * 100) : 0;
+            html += `
+                <div class="specific-stat">
+                    <span class="stat-value">${inhibRate}%</span>
+                    <span class="stat-label">Inhibition Success</span>
+                </div>
+                <div class="specific-stat">
+                    <span class="stat-value">${inhibFail}</span>
+                    <span class="stat-label">False Positives</span>
+                </div>
+            `;
+            break;
+        case 6: // Memory
+            const seqErrors = sessions.reduce((a, s) => a + (s.sequenceErrors || 0), 0);
+            html += `
+                <div class="specific-stat">
+                    <span class="stat-value">${seqErrors}</span>
+                    <span class="stat-label">Sequence Errors</span>
+                </div>
+            `;
+            break;
+        case 7: // Cognitive Switch
+            const switchErrors = sessions.reduce((a, s) => a + (s.switchErrors || 0), 0);
+            html += `
+                <div class="specific-stat">
+                    <span class="stat-value">${switchErrors}</span>
+                    <span class="stat-label">Switch Errors</span>
+                </div>
+            `;
+            break;
+        default:
+            const minRt = Math.min(...sessions.filter(s => s.minRt).map(s => s.minRt));
+            if (minRt && minRt !== Infinity) {
+                html += `
+                    <div class="specific-stat">
+                        <span class="stat-value">${minRt}ms</span>
+                        <span class="stat-label">Best RT</span>
+                    </div>
+                `;
+            }
     }
     
-    const scores = sessions.map(s => s.score);
-    const rts = sessions.filter(s => s.avgRt).map(s => s.avgRt);
-    const accs = sessions.map(s => s.accuracy);
-    
-    // Calculate standard deviations
-    const scoreMean = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const scoreStd = Math.round(Math.sqrt(scores.reduce((a, b) => a + Math.pow(b - scoreMean, 2), 0) / scores.length));
-    
-    const rtMean = rts.length > 0 ? rts.reduce((a, b) => a + b, 0) / rts.length : 0;
-    const rtStd = rts.length > 0 ? Math.round(Math.sqrt(rts.reduce((a, b) => a + Math.pow(b - rtMean, 2), 0) / rts.length)) : 0;
-    
-    // Consistency rating
-    const scoreCV = scoreMean > 0 ? (scoreStd / scoreMean) * 100 : 0;
-    const rtCV = rtMean > 0 ? (rtStd / rtMean) * 100 : 0;
-    
-    let consistencyRating = 'STABLE';
-    let consistencyColor = '#00ff99';
-    if (scoreCV > 30 || rtCV > 30) {
-        consistencyRating = 'VARIABLE';
-        consistencyColor = '#ffcc00';
-    }
-    if (scoreCV > 50 || rtCV > 50) {
-        consistencyRating = 'INCONSISTENT';
-        consistencyColor = '#ff3366';
+    // RT consistency
+    const avgStdDev = calculateAvg(sessions.filter(s => s.rtStdDev), 'rtStdDev');
+    if (avgStdDev > 0) {
+        html += `
+            <div class="specific-stat">
+                <span class="stat-value">±${avgStdDev}ms</span>
+                <span class="stat-label">RT Consistency</span>
+            </div>
+        `;
     }
     
-    // Improvement detection
-    const firstHalf = sessions.slice(0, Math.floor(sessions.length / 2));
-    const secondHalf = sessions.slice(Math.floor(sessions.length / 2));
-    const firstAvg = calculateAverage(firstHalf, 'score');
-    const secondAvg = calculateAverage(secondHalf, 'score');
-    const improvement = secondAvg - firstAvg;
-    
-    return `
-        <div class="consistency-grid">
-            <div class="consistency-card">
-                <div class="consistency-rating" style="color: ${consistencyColor}">${consistencyRating}</div>
-                <div class="consistency-label">Overall Consistency</div>
-            </div>
-            <div class="consistency-card">
-                <div class="consistency-value">±${scoreStd}</div>
-                <div class="consistency-label">Score Variance</div>
-            </div>
-            <div class="consistency-card">
-                <div class="consistency-value">±${rtStd}ms</div>
-                <div class="consistency-label">RT Variance</div>
-            </div>
-            <div class="consistency-card">
-                <div class="consistency-value ${improvement > 0 ? 'positive' : improvement < 0 ? 'negative' : ''}">${improvement > 0 ? '+' : ''}${improvement}</div>
-                <div class="consistency-label">Score Trend</div>
-            </div>
-        </div>
-        <div class="consistency-insight">
-            ${improvement > 20 ? '📈 <strong>Great progress!</strong> Your scores are improving over time.' : 
-              improvement < -20 ? '📉 <strong>Performance dip detected.</strong> Consider taking a break or adjusting difficulty.' :
-              '📊 <strong>Steady performance.</strong> Your scores are consistent.'}
-            ${scoreCV > 30 ? ' Try to focus on consistency - large score swings indicate variable focus.' : ''}
-        </div>
-    `;
+    html += '</div>';
+    return html;
 }
 
-// ===== RECENT SESSIONS TABLE =====
-function createRecentSessionsTable(sessions, hideMode = false) {
-    if (sessions.length === 0) return '<div class="no-sessions">No sessions yet</div>';
+// ===== SESSIONS TABLE =====
+function createSessionsTable(sessions, hideMode = false) {
+    if (sessions.length === 0) return '<div class="no-sessions">No sessions</div>';
     
     let html = `
         <table class="sessions-table">
             <thead>
                 <tr>
                     ${hideMode ? '' : '<th>MODE</th>'}
-                    <th>DIFFICULTY</th>
-                    <th>SCORE</th>
+                    <th>STROBE</th>
                     <th>ACCURACY</th>
                     <th>AVG RT</th>
-                    <th>HITS</th>
+                    <th>TRIALS</th>
+                    <th>DIFFICULTY</th>
                     <th>DATE</th>
                 </tr>
             </thead>
@@ -546,16 +520,21 @@ function createRecentSessionsTable(sessions, hideMode = false) {
         const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         const modeColor = MODE_COLORS[s.mode] || '#fff';
-        const diffColor = DIFFICULTY_COLORS[s.difficulty] || '#888';
+        const diffChange = (s.endDifficulty || 0.3) - (s.startDifficulty || 0.3);
         
         html += `
             <tr>
                 ${hideMode ? '' : `<td style="color: ${modeColor}">${MODE_NAMES[s.mode] || 'Unknown'}</td>`}
-                <td style="color: ${diffColor}">${(s.difficulty || 'normal').toUpperCase()}</td>
-                <td class="score-cell">${s.score}</td>
+                <td>${s.strobe ? '⚡' : '—'}</td>
                 <td>${s.accuracy}%</td>
                 <td>${s.avgRt}ms</td>
-                <td>${s.hits || 0}/${s.shots || 0}</td>
+                <td>${s.hits || 0}/${s.trials || 0}</td>
+                <td>
+                    ${Math.round((s.endDifficulty || 0.3) * 100)}%
+                    <small class="${diffChange > 0 ? 'positive' : diffChange < 0 ? 'negative' : ''}">
+                        ${diffChange > 0 ? '+' : ''}${Math.round(diffChange * 100)}%
+                    </small>
+                </td>
                 <td class="date-cell">${dateStr} ${timeStr}</td>
             </tr>
         `;

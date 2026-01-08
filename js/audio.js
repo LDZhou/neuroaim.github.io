@@ -1,250 +1,135 @@
 // ==================== AUDIO SYSTEM ====================
-// Web Audio API based sound effects with Dopamine Feedback System
-// Combo hits increase pitch (Reward Prediction), misses play low defeat sound
+// Procedural sound effects using Web Audio API
 
 let audioCtx = null;
-
-// Combo tracking for dopamine feedback
-var comboCount = 0;
-const MAX_COMBO_PITCH = 12; // Max semitones to raise pitch
+let audioInitialized = false;
 
 function initAudio() {
-    if (!audioCtx) {
+    if (audioInitialized) return;
+    try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    // Resume context if suspended (browser autoplay policy)
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+        audioInitialized = true;
+    } catch(e) {
+        console.warn("Web Audio not supported:", e);
     }
 }
 
-// Reset combo on game start
+function playSound(type) {
+    if (!settings.soundEnabled || !audioCtx) return;
+    
+    try {
+        const now = audioCtx.currentTime;
+        const vol = settings.volume || 0.5;
+        
+        switch(type) {
+            case 'hit':
+                playTone(880, 0.08, vol * 0.4, 'sine');
+                playTone(1320, 0.06, vol * 0.3, 'sine', 0.02);
+                break;
+            case 'miss':
+                playTone(220, 0.15, vol * 0.3, 'sawtooth');
+                break;
+            case 'click':
+                playTone(660, 0.03, vol * 0.2, 'square');
+                break;
+            case 'lock':
+                playTone(440, 0.1, vol * 0.3, 'sine');
+                playTone(660, 0.1, vol * 0.3, 'sine', 0.05);
+                break;
+            case 'precision':
+                playTone(1046, 0.05, vol * 0.4, 'sine');
+                playTone(1318, 0.05, vol * 0.3, 'sine', 0.03);
+                playTone(1568, 0.08, vol * 0.3, 'sine', 0.06);
+                break;
+            case 'error':
+                playTone(200, 0.1, vol * 0.4, 'sawtooth');
+                playTone(150, 0.15, vol * 0.3, 'sawtooth', 0.05);
+                break;
+            case 'penalty':
+                playNoise(0.1, vol * 0.2);
+                playTone(110, 0.15, vol * 0.4, 'square');
+                break;
+            case 'combo':
+                const baseFreq = 523;
+                playTone(baseFreq, 0.05, vol * 0.3, 'sine');
+                playTone(baseFreq * 1.25, 0.05, vol * 0.25, 'sine', 0.04);
+                playTone(baseFreq * 1.5, 0.08, vol * 0.3, 'sine', 0.08);
+                break;
+        }
+    } catch(e) {
+        // Silently fail
+    }
+}
+
+function playTone(freq, duration, volume, type, delay = 0) {
+    if (!audioCtx) return;
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = type;
+    osc.frequency.value = freq;
+    
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(audioCtx.currentTime + delay);
+    osc.stop(audioCtx.currentTime + delay + duration + 0.01);
+}
+
+function playNoise(duration, volume) {
+    if (!audioCtx) return;
+    
+    const bufferSize = audioCtx.sampleRate * duration;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+    
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    source.start();
+    source.stop(audioCtx.currentTime + duration);
+}
+
+// Auto-init on first user interaction
+document.addEventListener('click', () => {
+    if (!audioInitialized && settings.soundEnabled) {
+        initAudio();
+    }
+}, { once: true });
+
+// ===== COMBO SYSTEM =====
+var comboCount = 0;
+var maxCombo = 0;
+
 function resetCombo() {
     comboCount = 0;
 }
 
-// Calculate pitch multiplier based on combo (each combo raises ~1 semitone)
-function getComboPitchMultiplier() {
-    const semitones = Math.min(comboCount, MAX_COMBO_PITCH);
-    return Math.pow(2, semitones / 12); // 12-TET formula
-}
-
-function playSound(type) {
-    // Initialize audio context on first interaction
-    if (!audioCtx) {
-        initAudio();
-    }
+function incrementCombo() {
+    comboCount++;
+    if (comboCount > maxCombo) maxCombo = comboCount;
     
-    if (!audioCtx || !settings.soundEnabled) return;
-    
-    // Resume if suspended
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    
-    const now = audioCtx.currentTime;
-    const vol = settings.volume || 0.5;
-    
-    switch (type) {
-        case 'hit': {
-            // Success hit - pitch increases with combo
-            comboCount++;
-            const pitchMult = getComboPitchMultiplier();
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            // Base frequencies scaled by combo
-            const baseFreq = 600 * pitchMult;
-            osc.frequency.setValueAtTime(baseFreq, now);
-            osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.05);
-            osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.12);
-            osc.type = 'sine';
-            
-            // Slightly louder at higher combos for satisfaction
-            const comboVol = Math.min(0.2 + comboCount * 0.01, 0.35);
-            gain.gain.setValueAtTime(comboVol * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-            osc.start(now);
-            osc.stop(now + 0.12);
-            
-            // Add harmonic sparkle at high combos
-            if (comboCount >= 5) {
-                const osc2 = audioCtx.createOscillator();
-                const gain2 = audioCtx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioCtx.destination);
-                osc2.frequency.setValueAtTime(baseFreq * 2, now);
-                osc2.type = 'sine';
-                gain2.gain.setValueAtTime(0.08 * vol, now);
-                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-                osc2.start(now);
-                osc2.stop(now + 0.08);
-            }
-            break;
-        }
-        case 'miss': {
-            // Miss - breaks combo, deep defeat sound
-            const hadCombo = comboCount >= 3;
-            comboCount = 0;
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            // Low descending tone
-            osc.frequency.setValueAtTime(180, now);
-            osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.25 * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-            osc.start(now);
-            osc.stop(now + 0.25);
-            
-            // Extra disappointment sound if broke a good combo
-            if (hadCombo) {
-                const osc2 = audioCtx.createOscillator();
-                const gain2 = audioCtx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioCtx.destination);
-                osc2.frequency.setValueAtTime(100, now + 0.05);
-                osc2.frequency.exponentialRampToValueAtTime(40, now + 0.35);
-                osc2.type = 'sawtooth';
-                gain2.gain.setValueAtTime(0.12 * vol, now + 0.05);
-                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-                osc2.start(now + 0.05);
-                osc2.stop(now + 0.35);
-            }
-            break;
-        }
-        case 'error': {
-            // Error/wrong input - similar to miss but distinct
-            comboCount = 0;
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(150, now);
-            osc.frequency.setValueAtTime(100, now + 0.1);
-            osc.type = 'sawtooth';
-            gain.gain.setValueAtTime(0.18 * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-            osc.start(now);
-            osc.stop(now + 0.2);
-            break;
-        }
-        case 'click': {
-            // UI click - neutral, doesn't affect combo
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(1000, now);
-            osc.frequency.exponentialRampToValueAtTime(600, now + 0.04);
-            osc.type = 'triangle';
-            gain.gain.setValueAtTime(0.1 * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
-            osc.start(now);
-            osc.stop(now + 0.04);
-            break;
-        }
-        case 'lock': {
-            // Target locked - ascending confirmation
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(400, now);
-            osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.12 * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-            osc.start(now);
-            osc.stop(now + 0.15);
-            break;
-        }
-        case 'precision': {
-            // Perfect hit (Mode 3 core) - bright double tone with combo
-            comboCount++;
-            const pitchMult = getComboPitchMultiplier();
-            
-            const osc1 = audioCtx.createOscillator();
-            const osc2 = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc1.connect(gain);
-            osc2.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            osc1.frequency.setValueAtTime(800 * pitchMult, now);
-            osc2.frequency.setValueAtTime(1200 * pitchMult, now);
-            osc1.frequency.exponentialRampToValueAtTime(1600 * pitchMult, now + 0.08);
-            osc2.frequency.exponentialRampToValueAtTime(2400 * pitchMult, now + 0.08);
-            osc1.type = 'sine';
-            osc2.type = 'sine';
-            
-            const comboVol = Math.min(0.15 + comboCount * 0.01, 0.25);
-            gain.gain.setValueAtTime(comboVol * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-            osc1.start(now);
-            osc2.start(now);
-            osc1.stop(now + 0.12);
-            osc2.stop(now + 0.12);
-            break;
-        }
-        case 'penalty': {
-            // Mode 3 penalty zone hit - breaks combo
-            comboCount = 0;
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(100, now);
-            osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
-            osc.type = 'sawtooth';
-            gain.gain.setValueAtTime(0.22 * vol, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-            osc.start(now);
-            osc.stop(now + 0.3);
-            break;
-        }
-        case 'streak': {
-            // Milestone sound for combo milestones (5, 10, 15...)
-            const osc1 = audioCtx.createOscillator();
-            const osc2 = audioCtx.createOscillator();
-            const osc3 = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc1.connect(gain);
-            osc2.connect(gain);
-            osc3.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            // Major chord arpeggio
-            osc1.frequency.setValueAtTime(523, now); // C5
-            osc2.frequency.setValueAtTime(659, now + 0.05); // E5
-            osc3.frequency.setValueAtTime(784, now + 0.1); // G5
-            osc1.type = osc2.type = osc3.type = 'sine';
-            
-            gain.gain.setValueAtTime(0.15 * vol, now);
-            gain.gain.setValueAtTime(0.15 * vol, now + 0.15);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-            
-            osc1.start(now);
-            osc2.start(now + 0.05);
-            osc3.start(now + 0.1);
-            osc1.stop(now + 0.4);
-            osc2.stop(now + 0.4);
-            osc3.stop(now + 0.4);
-            break;
-        }
+    // Play combo sound at milestones
+    if (comboCount > 0 && comboCount % 5 === 0) {
+        playSound('combo');
     }
 }
 
-// Get current combo count (for HUD display if needed)
-function getComboCount() {
-    return comboCount;
-}
+function getCombo() { return comboCount; }
+function getMaxCombo() { return maxCombo; }

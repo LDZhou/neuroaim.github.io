@@ -1,25 +1,19 @@
 // ==================== UI FUNCTIONS ====================
-// Screen management, modals, and UI interactions
+// Screen management, modals, interactions
+// UPDATED: No difficulty selection, strobe toggle in settings
 
-// Screen transitions
+// ===== SCREEN TRANSITIONS =====
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
+    const screen = document.getElementById(screenId);
+    if (screen) screen.classList.add('active');
     
     if (screenId === 'stats-screen' && typeof updateStatsDisplay === 'function') {
         updateStatsDisplay();
     }
 }
 
-function showMode2Difficulty() {
-    document.getElementById('difficulty-modal').classList.remove('hidden');
-}
-
-function hideDifficultyModal() {
-    document.getElementById('difficulty-modal').classList.add('hidden');
-}
-
-// Mode info modal
+// ===== MODE INFO MODAL =====
 function showModeInfo(mode) {
     if (typeof MODE_INFO === 'undefined') return;
     const info = MODE_INFO[mode];
@@ -27,7 +21,7 @@ function showModeInfo(mode) {
     
     let html = `<h2>${info.title}</h2>`;
     html += `<div class="info-section"><h4>HOW TO PLAY</h4><ul>${info.howTo.map(h => `<li>${h}</li>`).join('')}</ul></div>`;
-    html += `<div class="info-section"><h4>WHAT IT IMPROVES</h4><ul>${info.improves.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+    html += `<div class="info-section"><h4>NEURAL TARGETS</h4><ul>${info.improves.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
     html += `<div class="info-section"><h4>THE SCIENCE</h4><p>${info.science}</p></div>`;
     html += `<button class="info-close" onclick="closeInfoModal()">CLOSE</button>`;
     
@@ -39,11 +33,11 @@ function closeInfoModal() {
     document.getElementById('info-modal').classList.add('hidden');
 }
 
-// Settings
+// ===== SETTINGS MODAL =====
 function showSettings() {
     if (typeof updateSettingsUI === 'function') updateSettingsUI();
     if (typeof updateCrosshairPreview === 'function') updateCrosshairPreview();
-    // Noise is internal now, no UI update needed for it
+    updateStrobeToggles();
     document.getElementById('settings-modal').classList.remove('hidden');
 }
 
@@ -52,33 +46,56 @@ function closeSettings() {
     document.getElementById('settings-modal').classList.add('hidden');
 }
 
-// Result Screen
+function updateStrobeToggles() {
+    for (let mode = 1; mode <= 7; mode++) {
+        const el = document.getElementById(`strobe-mode-${mode}`);
+        if (el && settings.strobeEnabled) {
+            el.checked = settings.strobeEnabled[mode] || false;
+        }
+    }
+}
+
+function toggleModeStrobe(mode, enabled) {
+    if (typeof toggleStrobe === 'function') {
+        toggleStrobe(mode, enabled);
+    }
+}
+
+// ===== RESULT SCREEN =====
 function showResults(stats) {
-    document.getElementById('result-score').innerText = stats.score;
-    document.getElementById('result-hits').innerText = stats.hits;
-    document.getElementById('result-misses').innerText = stats.misses;
+    document.getElementById('result-mode').innerText = MODE_NAMES[stats.mode] || 'Unknown';
+    document.getElementById('result-strobe').innerText = stats.strobe ? 'STROBE ON' : 'NORMAL';
+    document.getElementById('result-strobe').className = stats.strobe ? 'strobe-badge active' : 'strobe-badge';
+    
     document.getElementById('result-accuracy').innerText = stats.accuracy + '%';
     document.getElementById('result-avgrt').innerText = stats.avgRt + ' ms';
+    document.getElementById('result-trials').innerText = stats.hits + ' / ' + stats.trials;
+    
+    const diffChange = stats.endDifficulty - stats.startDifficulty;
+    const diffEl = document.getElementById('result-difficulty');
+    diffEl.innerText = Math.round(stats.endDifficulty * 100) + '%';
+    
+    const changeEl = document.getElementById('result-diff-change');
+    changeEl.innerText = (diffChange >= 0 ? '+' : '') + Math.round(diffChange * 100) + '%';
+    changeEl.className = 'diff-change ' + (diffChange > 0 ? 'positive' : diffChange < 0 ? 'negative' : '');
+    
+    // Mini stats
+    document.getElementById('result-minrt').innerText = stats.minRt + 'ms';
+    document.getElementById('result-maxrt').innerText = stats.maxRt + 'ms';
+    document.getElementById('result-consistency').innerText = '±' + stats.rtStdDev + 'ms';
     
     showScreen('result-screen');
 }
 
 function restartGame() {
-    // Rely on globals from game-engine (currentMode, currentDifficulty)
-    // Assuming they are accessible as vars in that scope, or use a window var?
-    // Game engine stores them in let variables, so we need to call startGame with params
-    // BUT we don't have easy access to them here unless we exposed them or UI stored them.
-    // Hack: We can just recall showScreen('menu-screen') for now, OR better:
-    // We update startGame to store window.lastMode / window.lastDiff
     if (typeof startGame === 'function' && typeof currentMode !== 'undefined') {
-        startGame(currentMode, currentDifficulty); 
+        startGame(currentMode);
     } else {
-        // Fallback
         showScreen('menu-screen');
     }
 }
 
-// Pause / Resume Logic
+// ===== PAUSE / RESUME =====
 function togglePause() {
     if (!document.getElementById('game-screen').classList.contains('active')) return;
     
@@ -114,17 +131,22 @@ function quitGame() {
     showScreen('menu-screen');
 }
 
-// Listeners
+// ===== EVENT LISTENERS =====
 document.addEventListener('click', e => {
     if (e.target.classList.contains('info-modal')) closeInfoModal();
-    if (e.target.classList.contains('difficulty-modal')) hideDifficultyModal();
+    if (e.target.classList.contains('settings-modal')) closeSettings();
 });
 
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-        if (!document.getElementById('info-modal').classList.contains('hidden')) closeInfoModal();
-        else if (!document.getElementById('difficulty-modal').classList.contains('hidden')) hideDifficultyModal();
-        else if (!document.getElementById('settings-modal').classList.contains('hidden')) closeSettings();
-        else if (document.getElementById('game-screen').classList.contains('active')) togglePause();
+        if (!document.getElementById('info-modal').classList.contains('hidden')) {
+            closeInfoModal();
+        } else if (!document.getElementById('settings-modal').classList.contains('hidden')) {
+            closeSettings();
+        } else if (document.getElementById('game-screen').classList.contains('active')) {
+            togglePause();
+        }
     }
 });
+
+// MODE_NAMES is defined in stats.js

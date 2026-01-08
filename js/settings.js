@@ -1,313 +1,208 @@
-// ==================== GAME ENGINE ====================
-// Core game loop, input handling, state management
-// UPDATED: Mode 3 uses spawnMode3Target
+// ==================== SETTINGS MANAGEMENT ====================
+// User preferences, per-mode strobe toggles, difficulty levels
 
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
+const SETTINGS_KEY = 'neuroaim_settings_v3';
 
-// GLOBAL STATE
-window.canvasWidth = window.innerWidth;
-window.canvasHeight = window.innerHeight;
-window.gamePhase = 'waiting'; 
-window.mouseX = 0;
-window.mouseY = 0;
-window.target = null;
-window.gazeBreaks = 0; // Track gaze breaks for stats
-
-// Internals - GLOBAL for cross-file access
-var currentMode = 1;
-var currentDifficulty = 'medium';
-var score = 0, hits = 0, misses = 0, shots = 0;
-var reactionTimes = [];
-var timeLeft = 0;
-var gameStartTime = 0;
-var lastFrameTime = 0;
-
-function initGame() {
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+// Default settings
+const defaultSettings = {
+    // Audio
+    soundEnabled: true,
+    volume: 0.5,
     
+    // Crosshair
+    crosshair: 'cross',
+    crosshairScale: 1.0,
+    
+    // Mouse
+    sensitivity: 1.0,
+    
+    // Per-mode strobe settings (false = off by default)
+    strobeEnabled: {
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+        6: false,
+        7: false
+    },
+    
+    // Per-mode difficulty levels (adaptive, stored between sessions)
+    difficultyLevels: {
+        1: { normal: 0.3, strobe: 0.3 },
+        2: { normal: 0.3, strobe: 0.3 },
+        3: { normal: 0.3, strobe: 0.3 },
+        4: { normal: 0.3, strobe: 0.3 },
+        5: { normal: 0.3, strobe: 0.3 },
+        6: { normal: 0.3, strobe: 0.3 },
+        7: { normal: 0.3, strobe: 0.3 }
+    }
+};
+
+// Global settings object
+var settings = { ...defaultSettings };
+
+function loadSettings() {
     try {
-        if (typeof loadStats === 'function') loadStats();
-        if (typeof loadSettings === 'function') loadSettings();
-        if (typeof NoiseSystem !== 'undefined') NoiseSystem.init(window.canvasWidth, window.canvasHeight);
+        const saved = localStorage.getItem(SETTINGS_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Deep merge with defaults to handle new settings
+            settings = deepMerge(defaultSettings, parsed);
+        }
     } catch(e) {
-        console.error("Init warning:", e);
+        console.warn('Settings load failed:', e);
+        settings = { ...defaultSettings };
     }
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKeyDown); // [NEW] Keyboard for Mode 4 WASD
-    
-    requestAnimationFrame(gameLoop);
+    return settings;
 }
 
-function resizeCanvas() {
-    window.canvasWidth = window.innerWidth;
-    window.canvasHeight = window.innerHeight;
-    canvas.width = window.canvasWidth;
-    canvas.height = window.canvasHeight;
-    
-    if (typeof NoiseSystem !== 'undefined') {
-        NoiseSystem.init(window.canvasWidth, window.canvasHeight);
+function saveSettings() {
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch(e) {
+        console.warn('Settings save failed:', e);
     }
 }
 
-function startGame(mode, difficulty) {
-    if (typeof showScreen === 'function') showScreen('game-screen');
-    const diffModal = document.getElementById('difficulty-modal');
-    if (diffModal) diffModal.classList.add('hidden');
+function resetSettings() {
+    settings = JSON.parse(JSON.stringify(defaultSettings));
+    saveSettings();
+    updateSettingsUI();
+    updateCrosshairPreview();
+}
 
-    currentMode = mode;
-    currentDifficulty = difficulty;
-    
-    // Reset Globals
-    score = 0; hits = 0; misses = 0; shots = 0; reactionTimes = [];
-    window.gazeBreaks = 0;
-    window.gamePhase = 'waiting';
-    if (typeof resetCombo === 'function') resetCombo(); // Reset audio combo
-    
-    // Auto Noise & Speed
-    let autoNoiseLevel = 1;
-    let noiseSpeedScale = 1.0;
-
-    if (mode === 1) {
-        if (difficulty === 'easy') { autoNoiseLevel = 3; noiseSpeedScale = 1.0; }
-        else if (difficulty === 'medium') { autoNoiseLevel = 3; noiseSpeedScale = 1.6; }
-        else if (difficulty === 'hard') { autoNoiseLevel = 4; noiseSpeedScale = 1.6; }
-    } else if (mode === 2) {
-        // Easy: no noise, Medium: minimal noise, Hard: strobe
-        if (difficulty === 'easy') autoNoiseLevel = 1;
-        else if (difficulty === 'medium') autoNoiseLevel = 1;
-        else if (difficulty === 'hard') autoNoiseLevel = 4; // Strobe for hard
-        noiseSpeedScale = 1.0;
-    } else if (mode === 3) {
-        if (difficulty === 'easy') autoNoiseLevel = 1;
-        else if (difficulty === 'medium') autoNoiseLevel = 2; 
-        else if (difficulty === 'hard') autoNoiseLevel = 4; 
-    } else if (mode === 4) {
-        if (difficulty === 'easy') autoNoiseLevel = 0;
-        else if (difficulty === 'medium') autoNoiseLevel = 1;
-        else if (difficulty === 'hard') autoNoiseLevel = 2;
+// Deep merge helper
+function deepMerge(target, source) {
+    const result = { ...target };
+    for (const key in source) {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+            result[key] = deepMerge(target[key] || {}, source[key]);
+        } else {
+            result[key] = source[key];
+        }
     }
+    return result;
+}
 
-    if (typeof settings !== 'undefined') settings.noiseLevel = autoNoiseLevel;
-    if (typeof NoiseSystem !== 'undefined') {
-        NoiseSystem.setSpeedScale(noiseSpeedScale);
-        NoiseSystem.regenerate();
-    }
+// ===== UI UPDATE FUNCTIONS =====
+function updateSettingsUI() {
+    // Sound
+    const soundEl = document.getElementById('setting-soundEnabled');
+    if (soundEl) soundEl.checked = settings.soundEnabled;
     
-    if (mode === 2) timeLeft = CFG.mode2.trackTime;
-    else timeLeft = 60; 
+    // Volume
+    const volEl = document.getElementById('setting-volume');
+    const volVal = document.getElementById('volume-value');
+    if (volEl) volEl.value = settings.volume;
+    if (volVal) volVal.innerText = Math.round(settings.volume * 100) + '%';
     
-    updateScoreDisplay();
+    // Sensitivity
+    const sensEl = document.getElementById('setting-sensitivity');
+    const sensVal = document.getElementById('sens-value');
+    if (sensEl) sensEl.value = settings.sensitivity;
+    if (sensVal) sensVal.innerText = settings.sensitivity.toFixed(1) + 'x';
     
-    window.gamePhase = 'countdown';
-    startCountdown(3, () => {
-        window.gamePhase = 'playing';
-        gameStartTime = performance.now();
-        lastFrameTime = performance.now(); 
-        
-        // Mode Specific Init
-        if (mode === 4 && typeof initMode4 === 'function') initMode4();
-        else if (mode === 3 && typeof spawnMode3Target === 'function') spawnMode3Target();
-        else if (mode === 2 && typeof initMode2Target === 'function') initMode2Target();
-        else spawnTarget();
+    // Crosshair scale
+    const scaleEl = document.getElementById('setting-scale');
+    const scaleVal = document.getElementById('scale-value');
+    if (scaleEl) scaleEl.value = settings.crosshairScale;
+    if (scaleVal) scaleVal.innerText = settings.crosshairScale.toFixed(1) + 'x';
+    
+    // Crosshair type
+    document.querySelectorAll('.crosshair-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.ch === settings.crosshair);
     });
-}
-
-function startCountdown(seconds, callback) {
-    let count = seconds;
-    const overlay = document.getElementById('countdown-overlay');
-    const clickPrompt = document.getElementById('click-prompt');
-    const countText = document.getElementById('countdown-text');
     
-    if(overlay) overlay.style.display = 'flex';
-    if(clickPrompt) clickPrompt.style.display = 'none';
-    if(countText) {
-        countText.style.display = 'block';
-        countText.innerText = count;
-        countText.style.color = '#00d9ff';
+    // Per-mode strobe toggles
+    for (let mode = 1; mode <= 7; mode++) {
+        const strobeEl = document.getElementById(`strobe-mode-${mode}`);
+        if (strobeEl) {
+            strobeEl.checked = settings.strobeEnabled[mode] || false;
+        }
     }
-    
-    playSound('click');
-    const timer = setInterval(() => {
-        count--;
-        if (count > 0) {
-            if(countText) countText.innerText = count;
-            playSound('click');
-        } else {
-            clearInterval(timer);
-            if(overlay) overlay.style.display = 'none';
-            callback();
-        }
-    }, 1000);
 }
 
-function endGame() {
-    window.gamePhase = 'ended';
-    playSound('click');
+function updateSetting(key, value) {
+    settings[key] = value;
+    saveSettings();
+}
+
+function updateSensitivity(value) {
+    settings.sensitivity = parseFloat(value);
+    const el = document.getElementById('sens-value');
+    if (el) el.innerText = settings.sensitivity.toFixed(1) + 'x';
+    saveSettings();
+}
+
+function updateVolume(value) {
+    settings.volume = parseFloat(value);
+    const el = document.getElementById('volume-value');
+    if (el) el.innerText = Math.round(settings.volume * 100) + '%';
+    saveSettings();
+}
+
+function setCrosshair(type) {
+    settings.crosshair = type;
+    document.querySelectorAll('.crosshair-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.ch === type);
+    });
+    updateCrosshairPreview();
+    saveSettings();
+}
+
+function updateCrosshairScale(value) {
+    settings.crosshairScale = parseFloat(value);
+    const el = document.getElementById('scale-value');
+    if (el) el.innerText = settings.crosshairScale.toFixed(1) + 'x';
+    updateCrosshairPreview();
+    saveSettings();
+}
+
+function updateCrosshairPreview() {
+    const canvas = document.getElementById('crosshair-preview-canvas');
+    if (!canvas) return;
     
-    try {
-        const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
-        const avgRt = reactionTimes.length > 0 
-            ? Math.round(reactionTimes.reduce((a,b) => a+b, 0) / reactionTimes.length) 
-            : 0;
-        
-        // Calculate additional stats
-        const minRt = reactionTimes.length > 0 ? Math.min(...reactionTimes) : 0;
-        const maxRt = reactionTimes.length > 0 ? Math.max(...reactionTimes) : 0;
-        
-        // Reaction time consistency (standard deviation)
-        let rtStdDev = 0;
-        if (reactionTimes.length > 1) {
-            const mean = avgRt;
-            const squaredDiffs = reactionTimes.map(rt => Math.pow(rt - mean, 2));
-            rtStdDev = Math.round(Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / reactionTimes.length));
-        }
-            
-        if (typeof saveGameStats === 'function') {
-            saveGameStats({
-                mode: currentMode,
-                difficulty: currentDifficulty,
-                score: score,
-                accuracy: accuracy,
-                avgRt: avgRt,
-                minRt: Math.round(minRt),
-                maxRt: Math.round(maxRt),
-                rtStdDev: rtStdDev,
-                hits: hits,
-                misses: misses,
-                shots: shots,
-                gazeBreaks: window.gazeBreaks || 0,
-                reactionTimes: reactionTimes.slice(0, 50), // Store first 50 for analysis
-                timestamp: Date.now()
-            });
-        }
-        
-        if (typeof showResults === 'function') {
-            showResults({ 
-                score, 
-                accuracy, 
-                avgRt, 
-                hits, 
-                misses,
-                minRt: Math.round(minRt),
-                maxRt: Math.round(maxRt),
-                rtStdDev
-            });
-        }
-    } catch(e) {
-        console.error("CRITICAL: Error in endGame", e);
-        if (typeof showScreen === 'function') showScreen('result-screen');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.parentElement.clientWidth || 200;
+    const h = 80;
+    canvas.width = w;
+    canvas.height = h;
+    
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, w, h);
+    
+    if (typeof drawCrosshairAt === 'function') {
+        drawCrosshairAt(ctx, w/2, h/2, settings.crosshair, settings.crosshairScale);
     }
 }
 
-function gameLoop(timestamp) {
-    if (!lastFrameTime) lastFrameTime = timestamp;
-    let dt = timestamp - lastFrameTime;
-    lastFrameTime = timestamp;
-    if (dt > 100) dt = 16.67; 
-    
-    if (window.gamePhase === 'playing') {
-        timeLeft -= dt / 1000;
-        const timeEl = document.getElementById('hud-time');
-        if (timeEl) timeEl.innerText = Math.max(0, Math.ceil(timeLeft));
-        
-        if (timeLeft <= 0) {
-            endGame();
-        } else {
-            if (typeof NoiseSystem !== 'undefined') NoiseSystem.update(dt);
-            
-            if (currentMode === 1 && typeof updateMode1 === 'function') updateMode1(timestamp, dt);
-            else if (currentMode === 2 && typeof updateMode2 === 'function') updateMode2(timestamp, dt);
-            else if (currentMode === 3 && typeof updateMode3 === 'function') updateMode3(timestamp, dt);
-            else if (currentMode === 4 && typeof updateMode4 === 'function') updateMode4(timestamp, dt);
-        }
+// ===== STROBE TOGGLE =====
+function toggleStrobe(mode, enabled) {
+    if (!settings.strobeEnabled) settings.strobeEnabled = {};
+    settings.strobeEnabled[mode] = enabled;
+    saveSettings();
+}
+
+// ===== DIFFICULTY LEVEL MANAGEMENT =====
+function getDifficultyLevel(mode, isStrobe) {
+    const key = isStrobe ? 'strobe' : 'normal';
+    if (settings.difficultyLevels && settings.difficultyLevels[mode]) {
+        return settings.difficultyLevels[mode][key] || CFG.adaptive.initialLevel;
     }
-    
-    render();
-    requestAnimationFrame(gameLoop);
+    return CFG.adaptive.initialLevel;
 }
 
-function render() {
-    if (typeof drawBackground === 'function') {
-        drawBackground(ctx, window.canvasWidth, window.canvasHeight);
-        
-        if (window.gamePhase === 'playing' && window.target) {
-            if (currentMode === 1) drawGaborTarget(ctx);
-            else if (currentMode === 2) drawTrackingTarget(ctx);
-            else if (currentMode === 3) drawSurgicalTarget(ctx);
-            else if (currentMode === 4) drawLandoltTarget(ctx);
-            
-            // Draw afterGaze indicator for Mode 2
-            if (currentMode === 2 && typeof mode2AfterGazeState !== 'undefined' && mode2AfterGazeState) {
-                drawMode2AfterGaze(ctx);
-            }
-        }
-        
-        if (typeof drawNoiseLayer === 'function') drawNoiseLayer(ctx);
-        drawCrosshair(ctx, window.mouseX, window.mouseY);
+function setDifficultyLevel(mode, isStrobe, level) {
+    if (!settings.difficultyLevels) settings.difficultyLevels = {};
+    if (!settings.difficultyLevels[mode]) {
+        settings.difficultyLevels[mode] = { normal: 0.3, strobe: 0.3 };
     }
+    const key = isStrobe ? 'strobe' : 'normal';
+    settings.difficultyLevels[mode][key] = Math.max(CFG.adaptive.minLevel, Math.min(CFG.adaptive.maxLevel, level));
+    saveSettings();
 }
 
-function handleMouseMove(e) {
-    const rect = canvas.getBoundingClientRect();
-    window.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    window.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
-}
-
-function handleMouseDown(e) {
-    if (window.gamePhase !== 'playing') return;
-    if (e.button !== 0) return; 
-    
-    const t = window.target;
-    if (!t) return;
-
-    // Shot counting (Exclude reset clicks in Mode 4)
-    if (currentMode !== 4 || (currentMode === 4 && !t.isResetPoint)) {
-        shots++;
-    }
-    
-    const dx = window.mouseX - t.x;
-    const dy = window.mouseY - t.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    
-    if (currentMode === 1) handleMode1Click(dist);
-    else if (currentMode === 2) handleMode2Click(dist);
-    else if (currentMode === 3) handleMode3Click(dist);
-    else if (currentMode === 4) handleMode4Click(dist);
-    
-    updateScoreDisplay();
-}
-
-function updateScoreDisplay() {
-    const elScore = document.getElementById('hud-score');
-    if(elScore) elScore.innerText = score;
-    const acc = shots > 0 ? Math.round((hits / shots) * 100) : 100;
-    const elAcc = document.getElementById('hud-accuracy');
-    if(elAcc) elAcc.innerText = acc + '%';
-}
-
-// [NEW] Handle keyboard input for Mode 4 WASD
-function handleKeyDown(e) {
-    if (window.gamePhase !== 'playing') return;
-    
-    // Only Mode 4 uses WASD
-    if (currentMode === 4) {
-        const key = e.key.toLowerCase();
-        let dir = -1;
-        
-        // Map WASD/Arrows to direction codes (0:Right, 1:Down, 2:Left, 3:Up)
-        if (key === 'd' || key === 'arrowright') dir = 0;
-        else if (key === 's' || key === 'arrowdown') dir = 1;
-        else if (key === 'a' || key === 'arrowleft') dir = 2;
-        else if (key === 'w' || key === 'arrowup') dir = 3;
-        
-        if (dir !== -1) {
-            if (typeof handleMode4Input === 'function') {
-                handleMode4Input(dir);
-            }
-        }
-    }
+function isStrobeEnabled(mode) {
+    return settings.strobeEnabled && settings.strobeEnabled[mode] === true;
 }

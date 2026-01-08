@@ -1,37 +1,33 @@
 // ==================== MAIN INITIALIZATION ====================
-// Entry point and initialization logic
+// Entry point
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Neuro-Aim: System Boot...");
+    console.log("Neuro-Aim v3: System Boot...");
+    console.log("7 Modes | Adaptive Difficulty | Strobe Toggle");
 
-    // 1. Load User Settings
-    // Retrieves sensitivity, volume, and noise levels from LocalStorage
-    loadSettings();
+    // 1. Load Settings first (must exist before other modules use it)
+    if (typeof loadSettings === 'function') {
+        loadSettings();
+        console.log("Settings loaded");
+    } else {
+        console.warn("loadSettings not found, using defaults");
+    }
 
     // 2. Initialize Game Engine
-    // Sets up the Canvas size, context, and event listeners
-    initGame();
-
-    // 3. Initialize Neuro-Noise System (CRITICAL)
-    // Pre-generates the noise textures immediately so there's no lag when game starts
-    if (typeof NoiseSystem !== 'undefined') {
-        NoiseSystem.init(window.innerWidth, window.innerHeight);
+    if (typeof initGame === 'function') {
+        initGame();
+        console.log("Game initialized");
+    } else {
+        console.error("initGame not found!");
     }
 
-    // 4. Sync UI Elements
-    // Updates all sliders (Sensitivity, Volume, Noise Level) to match loaded settings
-    updateSettingsUI();
-
-    // 5. Crosshair Preview
-    // Draws the initial crosshair in the settings menu
-    updateCrosshairPreview();
-
-    // 6. Audio System Hints
-    // Note: AudioContext usually resumes on the first user interaction (click),
-    // but we prepare the volume level here.
-    if (typeof audioCtx !== 'undefined' && typeof settings !== 'undefined') {
-        // Pre-set volume var if needed, though ui.js handles the slider
+    // 3. Sync UI
+    if (typeof updateSettingsUI === 'function') {
+        updateSettingsUI();
+    }
+    if (typeof updateCrosshairPreview === 'function') {
+        updateCrosshairPreview();
     }
 
-    console.log("Neuro-Aim: Systems Nominal. Ready for protocol.");
+    console.log("Neuro-Aim: Systems Ready.");
 });
