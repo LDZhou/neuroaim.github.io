@@ -37,6 +37,7 @@ function initGame() {
     
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown); // [NEW] Keyboard for Mode 4 WASD
     
     requestAnimationFrame(gameLoop);
 }
@@ -64,6 +65,7 @@ function startGame(mode, difficulty) {
     score = 0; hits = 0; misses = 0; shots = 0; reactionTimes = [];
     window.gazeBreaks = 0;
     window.gamePhase = 'waiting';
+    if (typeof resetCombo === 'function') resetCombo(); // Reset audio combo
     
     // Auto Noise & Speed
     let autoNoiseLevel = 1;
@@ -74,7 +76,11 @@ function startGame(mode, difficulty) {
         else if (difficulty === 'medium') { autoNoiseLevel = 3; noiseSpeedScale = 1.6; }
         else if (difficulty === 'hard') { autoNoiseLevel = 4; noiseSpeedScale = 1.6; }
     } else if (mode === 2) {
-        autoNoiseLevel = 1; noiseSpeedScale = 1.0;
+        // Easy: no noise, Medium: minimal noise, Hard: strobe
+        if (difficulty === 'easy') autoNoiseLevel = 1;
+        else if (difficulty === 'medium') autoNoiseLevel = 1;
+        else if (difficulty === 'hard') autoNoiseLevel = 4; // Strobe for hard
+        noiseSpeedScale = 1.0;
     } else if (mode === 3) {
         if (difficulty === 'easy') autoNoiseLevel = 1;
         else if (difficulty === 'medium') autoNoiseLevel = 2; 
@@ -281,4 +287,27 @@ function updateScoreDisplay() {
     const acc = shots > 0 ? Math.round((hits / shots) * 100) : 100;
     const elAcc = document.getElementById('hud-accuracy');
     if(elAcc) elAcc.innerText = acc + '%';
+}
+
+// [NEW] Handle keyboard input for Mode 4 WASD
+function handleKeyDown(e) {
+    if (window.gamePhase !== 'playing') return;
+    
+    // Only Mode 4 uses WASD
+    if (currentMode === 4) {
+        const key = e.key.toLowerCase();
+        let dir = -1;
+        
+        // Map WASD/Arrows to direction codes (0:Right, 1:Down, 2:Left, 3:Up)
+        if (key === 'd' || key === 'arrowright') dir = 0;
+        else if (key === 's' || key === 'arrowdown') dir = 1;
+        else if (key === 'a' || key === 'arrowleft') dir = 2;
+        else if (key === 'w' || key === 'arrowup') dir = 3;
+        
+        if (dir !== -1) {
+            if (typeof handleMode4Input === 'function') {
+                handleMode4Input(dir);
+            }
+        }
+    }
 }

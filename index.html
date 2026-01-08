@@ -35,8 +35,8 @@
             <span class="mode-num">02</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(2)">?</button>
             <h3>PURE TRACKING</h3>
-            <p>Smooth pursuit. Track, hold, and <strong>stay steady after kill</strong>.</p>
-            <span class="tag">MT/V5 + PURSUIT + AFTERGAZE</span>
+            <p>Track <strong>organic curves</strong>. Hold steady after kill.</p>
+            <span class="tag">CEREBELLUM + PREDICTION</span>
         </div>
         
         <!-- MODE 3 -->
@@ -55,8 +55,8 @@
             <span class="mode-num">04</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(4)">?</button>
             <h3>LANDOLT SACCADE</h3>
-            <p><strong>Click Center</strong> → Find Target → Click Target → Repeat.</p>
-            <span class="tag">FOVEAL + SACCADE + RESET</span>
+            <p>Aim at target → Press <strong>WASD</strong> for gap direction.</p>
+            <span class="tag">DISCRIMINATION + VISUOMOTOR</span>
         </div>
     </div>
     
@@ -115,6 +115,23 @@
                     <input type="checkbox" id="setting-adaptiveContrast" onchange="updateSetting('adaptiveContrast', this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
+            </div>
+        </div>
+        <div class="settings-section">
+            <h3>AUDIO</h3>
+            <div class="setting-row">
+                <div><label>Sound Effects</label></div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-soundEnabled" onchange="updateSetting('soundEnabled', this.checked); if(this.checked) initAudio();">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div><label>Volume</label></div>
+                <div class="scale-control">
+                    <input type="range" class="scale-slider" id="setting-volume" min="0" max="1" step="0.05" value="0.5" oninput="updateVolume(this.value)">
+                    <span class="scale-value" id="volume-value">50%</span>
+                </div>
             </div>
         </div>
         <div class="settings-section">

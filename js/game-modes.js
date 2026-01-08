@@ -1,8 +1,8 @@
 // ==================== GAME MODES ====================
 // Mode-specific logic and click handlers
-// UPDATED: Mode 2 afterGaze, Mode 3 random core, Mode 4 click reset
+// UPDATED: Mode 2 organic movement, Mode 3 random core, Mode 4 WASD
 
-// Helper: Movement update
+// Helper: Movement update (linear bouncing)
 function updateMovement(obj, dt, speedMultiplier = 1.0) {
     if (!obj.vx) return; 
 
@@ -29,6 +29,37 @@ function updateMovement(obj, dt, speedMultiplier = 1.0) {
         
         obj.changeDirTimer = 2000 + Math.random() * 1000; 
     }
+}
+
+// [NEW] Organic Movement: Lissajous-like smooth curves simulating biological movement
+function updateOrganicMovement(obj, dt, timestamp) {
+    const t = timestamp * 0.001; // Convert to seconds
+    
+    // Multiple sine waves superimposed for pseudo-random smooth motion
+    // X component: base oscillation + fine variation
+    const vxBase = Math.sin(t * 1.5) * 4; 
+    const vxFine = Math.cos(t * 3.7) * 2;
+    obj.vx = (vxBase + vxFine) * 1.5;
+
+    // Y component: phase offset for elliptical/figure-8 trajectories
+    const vyBase = Math.cos(t * 1.2) * 4;
+    const vyFine = Math.sin(t * 4.1) * 2;
+    obj.vy = (vyBase + vyFine) * 1.5;
+
+    // Apply velocity
+    obj.x += obj.vx * (dt / 16.67);
+    obj.y += obj.vy * (dt / 16.67);
+
+    // Soft boundaries: apply turning force instead of hard bounce
+    const margin = 100;
+    const w = window.canvasWidth;
+    const h = window.canvasHeight;
+    const turnForce = 0.5;
+
+    if (obj.x < margin) obj.x += turnForce * (margin - obj.x);
+    if (obj.x > w - margin) obj.x -= turnForce * (obj.x - (w - margin));
+    if (obj.y < margin) obj.y += turnForce * (margin - obj.y);
+    if (obj.y > h - margin) obj.y -= turnForce * (obj.y - (h - margin));
 }
 
 // ===== MODE 1: GABOR SCOUT =====
@@ -153,12 +184,19 @@ function updateMode2(timestamp, dt) {
         return;
     }
     
-    updateMovement(t, dt / 16.67);
+    // [UPDATED] Choose movement mode based on difficulty
+    // Easy: linear bouncing, Medium/Hard: organic movement
+    if (currentDifficulty === 'medium' || currentDifficulty === 'hard') {
+        updateOrganicMovement(t, dt, timestamp);
+    } else {
+        updateMovement(t, dt / 16.67);
+    }
     
     const dx = window.mouseX - t.x;
     const dy = window.mouseY - t.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
     
+    // Same lock radius for all difficulties
     const radius = CFG.tracking.targetSize + 15; 
     
     if (dist <= radius) {
@@ -309,6 +347,45 @@ function updateMode4(timestamp, dt) {
     }
 }
 
+// [NEW] Mode 4 WASD Input Handler
+function handleMode4Input(inputDir) {
+    const t = window.target;
+    if (!t || mode4State !== 'target' || t.isResetPoint) return;
+
+    // Check if mouse is hovering over target
+    const dx = window.mouseX - t.x;
+    const dy = window.mouseY - t.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    
+    const hitRadius = t.size * 2.5;
+
+    if (dist <= hitRadius) {
+        // Check if direction matches gap direction
+        if (inputDir === t.gapDir) {
+            // Success: correct direction while hovering
+            score += 100;
+            hits++;
+            shots++; // Count as a shot
+            playSound('hit');
+            reactionTimes.push(performance.now() - t.spawnTime);
+            initMode4(); // Return to center reset
+        } else {
+            // Wrong direction
+            score -= 50;
+            shots++; // Count as a shot (miss)
+            flashEffect('warn', 'WRONG DIR');
+            playSound('error');
+            // Player can retry
+        }
+    } else {
+        // Pressed key without aiming at target
+        flashEffect('warn', 'AIM FIRST');
+    }
+    
+    updateScoreDisplay();
+}
+
+// [MODIFIED] handleMode4Click only handles center reset, not target
 function handleMode4Click(dist) {
     const t = window.target;
     
@@ -324,15 +401,8 @@ function handleMode4Click(dist) {
         }
         // Don't count as shot if clicking center
         shots--;
-    } else if (mode4State === 'target' && !t.isResetPoint) {
-        if (dist <= t.size * 2.5) { // Generous hitbox
-            score += 100;
-            hits++;
-            playSound('hit');
-            reactionTimes.push(performance.now() - t.spawnTime);
-            initMode4(); // Return to center
-        }
     }
+    // [REMOVED] Target clicking - now handled by WASD
 }
 
 // ===== UTILS =====

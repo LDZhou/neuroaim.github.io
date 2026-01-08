@@ -84,47 +84,71 @@ const MODE_INFO = {
     1: {
         title: 'GABOR SCOUT',
         howTo: [
-            '<span class="highlight">Easy</span>: Gabor Noise. Normal Speed.',
-            '<span class="highlight">Medium</span>: Fast Targets.',
-            '<span class="highlight">Hard</span>: Strobe Storm.',
-            'Click Vertical targets. Ignore Noise.'
+            '<span class="highlight">Easy</span>: Gabor noise field. Standard speed.',
+            '<span class="highlight">Medium</span>: Faster target movement.',
+            '<span class="highlight">Hard</span>: Strobe occlusion added.',
+            'Click <strong>Vertical</strong> Gabor patches only.',
+            'Ignore horizontal distractors.'
         ],
-        improves: [ 'V1 Orientation', 'Figure-Ground', 'Visual Speed' ],
-        science: `Trains visual cortex to filter signal from noise. Higher difficulties increase the temporal frequency (speed) and add occlusion (strobe).`
+        improves: [ 
+            'V1 Orientation Selectivity',
+            'Figure-Ground Segregation', 
+            'Crowding Resistance',
+            'Temporal Visual Processing'
+        ],
+        science: `This mode targets the <strong>primary visual cortex (V1)</strong> where orientation-selective neurons reside. The Gabor noise field mimics natural visual clutter, forcing your V1 to enhance signal-to-noise ratio. Higher difficulties increase temporal frequency and add stroboscopic occlusion, training <strong>temporal integration</strong> and <strong>predictive visual processing</strong> — critical for tracking targets through visual interruptions in FPS games.`
     },
     2: {
         title: 'PURE TRACKING',
         howTo: [
-            'Keep crosshair on the moving circle.',
-            'Wait for ring to turn <span class="highlight" style="color:#00ff99">GREEN</span>.',
-            '<strong>CLICK</strong> to eliminate.',
-            '<strong>HOLD</strong> cursor still after kill.',
-            '<span class="warn">Moving early = PENALTY + DELAY</span>'
+            'Keep crosshair on the moving target.',
+            'Ring fills while tracking → turns <span class="highlight" style="color:#00ff99">GREEN</span>.',
+            '<strong>CLICK</strong> when locked to eliminate.',
+            '<strong>HOLD STILL</strong> after kill (afterGaze).',
+            '<span class="highlight">Medium/Hard</span>: Organic Lissajous curves.',
+            '<span class="warn">Hard</span>: Strobe occlusion overlay.'
         ],
-        improves: [ 'Smooth Pursuit', 'Trigger Control', 'Stability', 'Post-Shot Discipline' ],
-        science: `A pure motor-tracking task. Separates the "Aim" (Tracking) from the "Shoot" (Decision) phase. After-gaze enforcement trains recoil control habits.`
+        improves: [ 
+            'Smooth Pursuit Eye Movement',
+            'Cerebellar Motor Prediction',
+            'MT/V5 Motion Processing',
+            'Post-Shot Stability (Recoil Control)'
+        ],
+        science: `Engages the <strong>cerebellum</strong> and <strong>area MT/V5</strong> for predictive motion tracking. The organic Lissajous movement (Medium/Hard) prevents simple linear extrapolation, forcing your brain to build <strong>complex internal motion models</strong>. The afterGaze requirement trains <strong>post-saccadic suppression control</strong> — the same neural pathway responsible for recoil management in FPS. Strobe mode adds <strong>temporal prediction under uncertainty</strong>, simulating muzzle flash occlusion.`
     },
     3: {
         title: 'SURGICAL LOCK',
         howTo: [
-            'Hit the <span style="color:#00d9ff">Cyan Core</span>.',
-            'Avoid the <span style="color:#ff3366">Red Halo</span>.',
+            'Hit the <span style="color:#00d9ff">cyan core</span> precisely.',
+            'Avoid the <span style="color:#ff3366">red penalty halo</span>.',
             '<span class="warn">Core position is RANDOM within halo!</span>',
-            'Precision is everything.'
+            'Decoys match target appearance exactly.',
+            'Pure precision — no time pressure.'
         ],
-        improves: [ 'Fine Motor Control', 'Inhibition', 'Visual Tracking', 'Micro-Adjustment' ],
-        science: `High-precision Fitts' Law task with unpredictable target placement, preventing muscle memory and forcing active visual acquisition.`
+        improves: [ 
+            'Fine Motor Inhibition',
+            'Premotor Cortex Precision',
+            'Superior Colliculus Targeting',
+            'Impulse Control'
+        ],
+        science: `A high-precision <strong>Fitts' Law</strong> task targeting the <strong>premotor cortex</strong> and <strong>superior colliculus</strong>. The random core placement prevents muscle memory, forcing active <strong>foveal acquisition</strong> on every trial. The penalty zone trains <strong>motor inhibition</strong> — the ability to suppress premature movements. Decoys matching target appearance engage <strong>visual discrimination circuits</strong>, teaching your brain to filter real targets from noise based on spatial context, not just appearance.`
     },
     4: {
         title: 'LANDOLT SACCADE',
         howTo: [
-            '<strong>CLICK CENTER</strong>: Click the center circle to spawn target.',
-            '<strong>SCAN</strong>: Find the Landolt C (Ring with gap).',
-            '<strong>CLICK TARGET</strong>: Acquire and click.',
-            '<strong>REPEAT</strong>: Click center → Click target → ...',
-            '<span class="warn">Hard Mode</span>: Target vanishes in 600ms.'
+            '<strong>CLICK CENTER</strong> to spawn target.',
+            '<strong>SACCADE</strong>: Move eyes/cursor to find the Landolt C.',
+            '<strong>HOVER</strong> over target, then press direction key:',
+            '<span class="highlight">W</span>=Up, <span class="highlight">A</span>=Left, <span class="highlight">S</span>=Down, <span class="highlight">D</span>=Right',
+            'Direction = where the <strong>gap</strong> is pointing.',
+            '<span class="warn">Hard</span>: Target vanishes in 800ms.'
         ],
-        improves: [ 'Saccadic Speed', 'Foveal Focus', 'Click Rhythm', 'Target Acquisition' ],
-        science: `Forces a "Center-Saccade-Acquire-Return" loop. The click requirement at center ensures proper eye reset between targets, preventing lazy peripheral aiming.`
+        improves: [ 
+            'Saccadic Eye Movement Speed',
+            'Visual Discrimination Under Pressure',
+            'Visuomotor Translation (WASD Mapping)',
+            'Frontal Eye Field Activation'
+        ],
+        science: `Combines <strong>saccadic targeting</strong> with <strong>forced visual discrimination</strong>. The Landolt C optotype requires foveal resolution to identify gap direction — peripheral vision cannot solve this task. The WASD response forces <strong>visuomotor translation</strong>: visual percept → cognitive decision → motor command. This engages the <strong>frontal eye fields (FEF)</strong>, <strong>parietal cortex</strong>, and <strong>premotor areas</strong> simultaneously. The center-reset loop ensures proper <strong>saccadic reset</strong> between targets, training the neural pathway for rapid target switching in FPS gameplay.`
     }
 };
