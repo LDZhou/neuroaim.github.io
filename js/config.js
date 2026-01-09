@@ -1,6 +1,6 @@
 // ==================== GAME CONFIGURATION ====================
 // Central configuration for all game parameters
-// UPDATED: 7 modes, adaptive difficulty (i+1), strobe as setting
+// FULL VERSION: Includes all Modes, Parameters, and Descriptions
 
 const CFG = {
     // ===== SESSION CONFIG =====
@@ -8,14 +8,13 @@ const CFG = {
     
     // ===== ADAPTIVE DIFFICULTY SYSTEM =====
     // Based on Vygotsky's Zone of Proximal Development (i+1)
-    // Difficulty adjusts in micro-increments based on rolling performance
     adaptive: {
         windowSize: 5,          // Rolling window for performance calculation
-        targetAccuracy: 0.75,   // Target 75% success rate (optimal learning zone)
-        stepUp: 0.02,           // Increase difficulty by 2% when performing well
-        stepDown: 0.03,         // Decrease by 3% when struggling (faster recovery)
+        targetAccuracy: 0.75,   // Target 75% success rate
+        stepUp: 0.02,           // Increase difficulty
+        stepDown: 0.03,         // Decrease difficulty
         minLevel: 0.1,          // Minimum difficulty (10%)
-        maxLevel: 1.0,          // Maximum difficulty (100%)
+        maxLevel: 5.0,          // UNCAPPED: Practical limit raised to 500%
         initialLevel: 0.3       // Start at 30% difficulty
     },
     
@@ -24,13 +23,12 @@ const CFG = {
         name: 'GABOR SCOUT',
         tag: 'V1 CORTEX + PERCEPTION',
         description: 'Identify <strong>Vertical</strong> targets in noise.',
-        // Adaptive parameters (scaled by difficulty 0.1-1.0)
         params: {
-            targetSize: { min: 60, max: 30 },        // Larger = easier
-            moveSpeed: { min: 2, max: 8 },           // Slower = easier
-            contrast: { min: 1.0, max: 0.15 },       // Higher = easier
-            noiseCount: { min: 20, max: 200 },       // Fewer = easier
-            timeout: { min: 4000, max: 1500 }        // Longer = easier
+            targetSize: { min: 60, max: 30 },        
+            moveSpeed: { min: 2, max: 8 },           
+            contrast: { min: 1.0, max: 0.15 },       
+            noiseCount: { min: 20, max: 200 },       
+            timeout: { min: 4000, max: 1500 }        
         }
     },
     
@@ -42,10 +40,10 @@ const CFG = {
         params: {
             targetSize: { min: 40, max: 20 },
             moveSpeed: { min: 3, max: 12 },
-            lockTime: { min: 0.6, max: 1.5 },        // Time needed to lock
-            afterGazeTime: { min: 300, max: 800 },   // Hold time after kill
-            gazeRadius: { min: 80, max: 40 },        // Tolerance radius
-            curveComplexity: { min: 1, max: 3 }      // Lissajous complexity
+            lockTime: { min: 0.6, max: 1.5 },        
+            afterGazeTime: { min: 300, max: 800 },   
+            gazeRadius: { min: 80, max: 40 },        
+            curveComplexity: { min: 1, max: 3 }      
         }
     },
     
@@ -53,13 +51,13 @@ const CFG = {
     mode3: {
         name: 'SURGICAL LOCK',
         tag: 'PREMOTOR + INHIBITION',
-        description: 'Zero tolerance. Hit <strong>Random Core</strong>. Avoid Halo.',
+        description: 'Hit <span style="color:#00d9ff">Core</span>. Avoid <span style="color:#aaa">Halo</span>. Precision over speed.',
         params: {
-            coreSize: { min: 12, max: 4 },           // Core radius
-            penaltySize: { min: 60, max: 35 },       // Penalty zone radius
-            coreOffset: { min: 0.3, max: 0.9 },      // How off-center core can be
-            decoyCount: { min: 0, max: 8 },          // Decoy targets
-            decoyMovement: { min: 0, max: 3 }        // Decoy speed
+            coreSize: { min: 12, max: 4 },           
+            penaltySize: { min: 60, max: 35 },       
+            coreOffset: { min: 0.3, max: 0.9 },      
+            decoyCount: { min: 0, max: 8 },          
+            decoyMovement: { min: 0, max: 3 }        
         }
     },
     
@@ -69,63 +67,64 @@ const CFG = {
         tag: 'DISCRIMINATION + VISUOMOTOR',
         description: 'Aim at target → Press <strong>WASD</strong> for gap direction.',
         params: {
-            ringSize: { min: 45, max: 16 },          // Landolt C size
+            ringSize: { min: 45, max: 16 },          
             contrast: { min: 1.0, max: 0.4 },
             timeout: { min: 5000, max: 800 },
-            eccentricity: { min: 150, max: 400 }     // Distance from center
+            eccentricity: { min: 150, max: 400 }     
         }
     },
     
-    // ===== MODE 5: PARAFOVEAL GHOST (NEW) =====
+    // ===== MODE 5: PARAFOVEAL GHOST =====
     mode5: {
         name: 'PARAFOVEAL GHOST',
         tag: 'PPC + COVERT ATTENTION',
         description: 'Track center. Shoot <strong>blue</strong> ghosts. Ignore <strong>red</strong>.',
         params: {
-            // Primary target (always present, must track)
             primarySize: { min: 35, max: 20 },
             primarySpeed: { min: 2, max: 6 },
-            // Ghost parameters
             ghostSize: { min: 30, max: 15 },
-            ghostDuration: { min: 1200, max: 400 },  // How long ghost visible
-            ghostEccentricity: { min: 200, max: 450 }, // Distance from center
-            ghostFrequency: { min: 2500, max: 1000 }, // Time between ghosts
-            blueRatio: { min: 0.7, max: 0.4 },       // % of ghosts that are blue (shoot)
-            returnWindow: { min: 1500, max: 600 }    // Time to return to primary
+            ghostDuration: { min: 1200, max: 400 },  
+            ghostEccentricity: { min: 200, max: 450 }, 
+            ghostFrequency: { min: 2500, max: 1000 }, 
+            blueRatio: { min: 0.7, max: 0.4 },       
+            returnWindow: { min: 1500, max: 600 },
+            decayNormal: { min: 0.8, max: 1.5 },     
+            decaySlow: { min: 0.2, max: 0.4 },       
+            decayFast: { min: 2.0, max: 4.0 } 
         }
     },
     
-    // ===== MODE 6: WORKING MEMORY SEQUENCER (NEW) =====
+    // ===== MODE 6: MEMORY SEQUENCER =====
     mode6: {
         name: 'MEMORY SEQUENCER',
         tag: 'dlPFC + SPATIAL MEMORY',
-        description: 'Memorize <strong>sequence</strong>. Shoot positions in order.',
+        description: 'Memorize <strong>random positions</strong>. Shoot in order. No hints.',
         params: {
-            sequenceLength: { min: 3, max: 7 },      // Number of targets
-            displayTime: { min: 600, max: 250 },     // Each target visible time
-            delayBeforeRecall: { min: 500, max: 1500 }, // Blank time before shooting
+            sequenceLength: { min: 2, max: 6 },      
+            displayTime: { min: 600, max: 250 },     
+            delayBeforeRecall: { min: 500, max: 1500 }, 
             targetSize: { min: 50, max: 25 },
-            spatialSpread: { min: 200, max: 400 },   // How spread out targets are
-            positionTolerance: { min: 60, max: 30 }  // Click accuracy needed
+            spatialSpread: { min: 100, max: 300 },
+            clusterRadius: { min: 200, max: 350 },   
+            positionTolerance: { min: 60, max: 30 }  
         }
     },
     
-    // ===== MODE 7: COGNITIVE SWITCH (NEW) =====
+    // ===== MODE 7: COGNITIVE SWITCH =====
     mode7: {
         name: 'COGNITIVE SWITCH',
         tag: 'ACC + RULE FLEXIBILITY',
-        description: 'Rules change with <strong>environment</strong>. Adapt instantly.',
+        description: 'Adapt to rule changes. <span style="color:#00d9ff">COLD</span> vs <span style="color:#ff8844">WARM</span>.',
         params: {
             targetSize: { min: 40, max: 22 },
             moveSpeed: { min: 3, max: 8 },
-            switchInterval: { min: 8000, max: 3000 }, // Time between rule changes
-            warningTime: { min: 1500, max: 500 },    // Warning before switch
-            targetFrequency: { min: 2000, max: 800 }, // Target spawn rate
-            inhibitionRatio: { min: 0.3, max: 0.5 }  // % of "don't shoot" targets
+            switchInterval: { min: 15000, max: 8000 }, // UPDATED: Much slower switching (8-15s)
+            warningTime: { min: 4000, max: 4000 },     // UPDATED: Fixed 4s warning for consistent countdown
+            targetFrequency: { min: 2000, max: 800 }, 
+            inhibitionRatio: { min: 0.3, max: 0.5 }  
         }
     },
     
-    // ===== STROBE SYSTEM (NOW IN SETTINGS) =====
     strobe: {
         freqMin: 3,
         freqMax: 6,
@@ -133,7 +132,6 @@ const CFG = {
         blindAlpha: 0.92
     },
     
-    // ===== NOISE SYSTEM =====
     noise: {
         baseSpeed: 6,
         gaborField: {
@@ -142,7 +140,7 @@ const CFG = {
     }
 };
 
-// ==================== MODE INFO ====================
+// ==================== MODE INFO (FULL TEXT RESTORED) ====================
 const MODE_INFO = {
     1: {
         title: 'GABOR SCOUT',
@@ -181,7 +179,7 @@ const MODE_INFO = {
         title: 'SURGICAL LOCK',
         howTo: [
             'Hit the <span style="color:#00d9ff">cyan core</span> precisely.',
-            'Avoid the <span style="color:#ff3366">red penalty halo</span>.',
+            'Avoid the <span style="color:#aaa">penalty halo</span>.',
             '<span class="warn">Core position is RANDOM within halo!</span>',
             'Decoys appear at higher difficulty.',
             'Pure precision — no time pressure.'
@@ -265,20 +263,27 @@ const MODE_INFO = {
 };
 
 // ==================== HELPER: GET SCALED PARAM =====
-// Returns a value interpolated between min and max based on difficulty level
 function getScaledParam(paramObj, difficulty) {
-    // difficulty: 0.1 (easiest) to 1.0 (hardest)
-    // For params where higher = easier (like size), min is easy value, max is hard value
-    const t = Math.max(0.1, Math.min(1.0, difficulty));
-    return paramObj.min + (paramObj.max - paramObj.min) * t;
+    const t = Math.max(0.1, difficulty); 
+    
+    let val = paramObj.min + (paramObj.max - paramObj.min) * t;
+    
+    if (paramObj.min > paramObj.max) {
+        const hardFloor = paramObj.max * 0.5;
+        val = Math.max(hardFloor, val);
+        
+        if (paramObj.max > 100) { 
+             val = Math.max(150, val);
+        }
+    }
+    
+    return val;
 }
 
-// ==================== HELPER: GET MODE CONFIG =====
 function getModeConfig(modeNum) {
     return CFG['mode' + modeNum] || null;
 }
 
-// Convenience wrapper - uses currentDifficulty from game-engine.js
 function getScaledValue(paramObj) {
     return getScaledParam(paramObj, typeof currentDifficulty !== 'undefined' ? currentDifficulty : 0.3);
 }

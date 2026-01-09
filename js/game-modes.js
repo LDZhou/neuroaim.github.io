@@ -158,6 +158,13 @@ function updateMode2(timestamp, dt) {
     var lockTime = getScaledValue(params.lockTime);
     
     if (dist <= trackRadius) {
+        // Continuous Scoring for Tracking
+        // Add a tiny fractional score every frame we are tracking
+        // This makes score reflect "Time on Target"
+        if (typeof score !== 'undefined') { // Assuming 'score' global variable from engine
+             score += (dt / 1000) * 10; // 10 points per second
+        }
+        
         mode2State.trackProgress += dt / 1000;
         if (mode2State.trackProgress >= lockTime) {
             mode2State.trackProgress = lockTime;

@@ -1,6 +1,7 @@
 // ==================== STATS MODULE ====================
 // Pure statistics tracking - no scoring
 // Separate strobe/non-strobe statistics
+// MODIFIED: Restored full logic + Added NCS (Neuro-Cognitive Score)
 
 const STATS_KEY = 'neuroaim_stats_v3';
 
@@ -16,6 +17,9 @@ function loadStats() {
 }
 
 function saveGameStats(session) {
+    // Add NCS before saving
+    session.ncs = calculateNCS(session);
+    
     const stats = loadStats();
     stats.push(session);
     if (stats.length > 2000) stats.shift();
@@ -25,6 +29,31 @@ function saveGameStats(session) {
     } catch (e) {
         console.warn("Storage full?", e);
     }
+}
+
+// ===== NCS CALCULATION (NEW) =====
+function calculateNCS(s) {
+    if (!s.trials || s.trials === 0) return 0;
+    
+    // 1. Difficulty Base (1000 pts per 1.0 diff)
+    // Uses average difficulty of the session
+    const avgDiff = ((s.startDifficulty || 0.3) + (s.endDifficulty || 0.3)) / 2;
+    const baseScore = avgDiff * 1000;
+    
+    // 2. Accuracy Weight (Exponential penalty)
+    const accuracy = s.hits / s.trials;
+    const accWeight = Math.pow(accuracy, 1.5);
+    
+    // 3. Speed Factor (Multiplier)
+    // 400ms base RT. Faster = bonus, Slower = penalty.
+    // Capped to prevent exploiting blind clicking.
+    const rt = s.avgRt || 1000;
+    const speedFactor = 400 / (Math.max(150, rt) + 50);
+    
+    // 4. Strobe Bonus (1.2x if Strobe enabled)
+    const strobeBonus = s.strobe ? 1.2 : 1.0;
+    
+    return Math.round(baseScore * accWeight * speedFactor * strobeBonus);
 }
 
 // ===== MODE METADATA =====
@@ -109,9 +138,13 @@ function updateStatsDisplay() {
     const stats = loadStats();
     const container = document.getElementById('stats-screen');
     
+    // Ensure container exists logic
+    if (!container) return;
+    
+    // Retain header if it exists
     const header = container.querySelector('.stats-header');
     container.innerHTML = '';
-    container.appendChild(header);
+    if(header) container.appendChild(header);
     
     if (stats.length === 0) {
         container.innerHTML += `
@@ -142,7 +175,7 @@ function updateStatsDisplay() {
     `;
     
     container.appendChild(mainContent);
-    switchStatsTab('all');
+    switchStatsTab('all'); // Trigger default tab
     
     // Clear button
     const clearBtn = document.createElement('button');
@@ -179,9 +212,10 @@ function createOverallSummary(stats) {
     const avgAccuracy = calculateAvg(stats, 'accuracy');
     const avgRt = calculateAvg(stats, 'avgRt');
     const strobeSessions = stats.filter(s => s.strobe).length;
-    
-    // Overall difficulty progression
     const avgEndDiff = calculateAvg(stats, 'endDifficulty');
+    
+    // Calculate AVG NCS
+    const avgNCS = calculateAvg(stats, 'ncs');
     
     return `
         <div class="stats-summary-grid">
@@ -192,6 +226,10 @@ function createOverallSummary(stats) {
             <div class="summary-card">
                 <div class="summary-value">${totalTime}m</div>
                 <div class="summary-label">TRAINING TIME</div>
+            </div>
+            <div class="summary-card purple">
+                <div class="summary-value">${avgNCS}</div>
+                <div class="summary-label">AVG NCS SCORE</div>
             </div>
             <div class="summary-card green">
                 <div class="summary-value">${avgAccuracy}%</div>
@@ -204,10 +242,6 @@ function createOverallSummary(stats) {
             <div class="summary-card cyan">
                 <div class="summary-value">${Math.round(avgEndDiff * 100)}%</div>
                 <div class="summary-label">AVG DIFFICULTY</div>
-            </div>
-            <div class="summary-card purple">
-                <div class="summary-value">${strobeSessions}</div>
-                <div class="summary-label">STROBE SESSIONS</div>
             </div>
         </div>
     `;
@@ -237,9 +271,9 @@ function createOverviewContent(stats) {
         
         const normalSessions = filterSessions(stats, mode, false);
         const strobeSessions = filterSessions(stats, mode, true);
+        const avgNCS = calculateAvg(modeSessions, 'ncs');
         const avgAcc = calculateAvg(modeSessions, 'accuracy');
         const avgRt = calculateAvg(modeSessions, 'avgRt');
-        const avgDiff = calculateAvg(modeSessions, 'endDifficulty');
         const trend = calculateTrend(modeSessions, 'accuracy');
         
         html += `
@@ -247,16 +281,16 @@ function createOverviewContent(stats) {
                 <div class="mode-perf-header" style="color: ${color}">${name}</div>
                 <div class="mode-perf-stats">
                     <div class="perf-stat">
+                        <span class="perf-value" style="color:#9966ff">${avgNCS}</span>
+                        <span class="perf-label">AVG NCS</span>
+                    </div>
+                    <div class="perf-stat">
                         <span class="perf-value">${avgAcc}%</span>
                         <span class="perf-label">ACCURACY</span>
                     </div>
                     <div class="perf-stat">
                         <span class="perf-value">${avgRt}ms</span>
                         <span class="perf-label">AVG RT</span>
-                    </div>
-                    <div class="perf-stat">
-                        <span class="perf-value">${Math.round(avgDiff * 100)}%</span>
-                        <span class="perf-label">DIFFICULTY</span>
                     </div>
                 </div>
                 <div class="mode-perf-footer">
@@ -305,7 +339,7 @@ function createModeDetailContent(stats, mode) {
     `;
     
     // Strobe vs Normal comparison
-    html += '<h4 class="subsection-title">NORMAL vs STROBE</h4>';
+    html += '<h4 class="subsection-title">NORMAL vs STROBE (NCS SCORES)</h4>';
     html += '<div class="strobe-comparison">';
     
     [{ label: 'NORMAL', sessions: normalSessions, strobe: false }, 
@@ -320,16 +354,19 @@ function createModeDetailContent(stats, mode) {
             return;
         }
         
+        const avgNCS = calculateAvg(sessions, 'ncs');
         const avgAcc = calculateAvg(sessions, 'accuracy');
         const avgRt = calculateAvg(sessions, 'avgRt');
         const avgDiff = calculateAvg(sessions, 'endDifficulty');
-        const bestDiff = Math.max(...sessions.map(s => s.endDifficulty || 0));
-        const progression = getDifficultyProgression(sessions);
         
         html += `
             <div class="strobe-card ${strobe ? 'strobe' : ''}">
                 <div class="strobe-header">${label} <span class="session-count">(${sessions.length} sessions)</span></div>
                 <div class="strobe-stats">
+                    <div class="strobe-stat highlight">
+                        <span class="stat-value" style="color: ${strobe ? '#ff66cc' : '#00d9ff'}">${avgNCS}</span>
+                        <span class="stat-label">NCS SCORE</span>
+                    </div>
                     <div class="strobe-stat">
                         <span class="stat-value">${avgAcc}%</span>
                         <span class="stat-label">Accuracy</span>
@@ -342,16 +379,6 @@ function createModeDetailContent(stats, mode) {
                         <span class="stat-value">${Math.round(avgDiff * 100)}%</span>
                         <span class="stat-label">Avg Diff</span>
                     </div>
-                    <div class="strobe-stat highlight">
-                        <span class="stat-value">${Math.round(bestDiff * 100)}%</span>
-                        <span class="stat-label">Peak Diff</span>
-                    </div>
-                </div>
-                <div class="strobe-progress">
-                    <span>Progression: ${Math.round(progression.start * 100)}% → ${Math.round(progression.end * 100)}%</span>
-                    <span class="${progression.change > 0 ? 'positive' : progression.change < 0 ? 'negative' : ''}">
-                        ${progression.change > 0 ? '+' : ''}${Math.round(progression.change * 100)}%
-                    </span>
                 </div>
             </div>
         `;
@@ -392,7 +419,7 @@ function createDifficultyChart(sessions, mode) {
         const barColor = s.strobe ? '#ff66cc' : color;
         bars += `
             <div class="chart-bar" style="width: ${width}%; height: ${height}%; background: ${barColor}" 
-                 title="${Math.round(diff * 100)}% (${s.strobe ? 'Strobe' : 'Normal'})"></div>
+                 title="NCS: ${s.ncs || 0} | ${Math.round(diff * 100)}% (${s.strobe ? 'Strobe' : 'Normal'})"></div>
         `;
     });
     
@@ -504,10 +531,10 @@ function createSessionsTable(sessions, hideMode = false) {
             <thead>
                 <tr>
                     ${hideMode ? '' : '<th>MODE</th>'}
+                    <th>NCS</th>
                     <th>STROBE</th>
                     <th>ACCURACY</th>
                     <th>AVG RT</th>
-                    <th>TRIALS</th>
                     <th>DIFFICULTY</th>
                     <th>DATE</th>
                 </tr>
@@ -521,14 +548,15 @@ function createSessionsTable(sessions, hideMode = false) {
         const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         const modeColor = MODE_COLORS[s.mode] || '#fff';
         const diffChange = (s.endDifficulty || 0.3) - (s.startDifficulty || 0.3);
+        const ncs = s.ncs || calculateNCS(s); // Calc on fly if old data
         
         html += `
             <tr>
                 ${hideMode ? '' : `<td style="color: ${modeColor}">${MODE_NAMES[s.mode] || 'Unknown'}</td>`}
+                <td style="color: #9966ff; font-weight:bold">${ncs}</td>
                 <td>${s.strobe ? '⚡' : '—'}</td>
                 <td>${s.accuracy}%</td>
                 <td>${s.avgRt}ms</td>
-                <td>${s.hits || 0}/${s.trials || 0}</td>
                 <td>
                     ${Math.round((s.endDifficulty || 0.3) * 100)}%
                     <small class="${diffChange > 0 ? 'positive' : diffChange < 0 ? 'negative' : ''}">
