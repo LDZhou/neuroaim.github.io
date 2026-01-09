@@ -4,11 +4,11 @@
 
 // ===== MODE STATE OBJECTS (will be reset by engine) =====
 var mode1State = { target: null };
-var mode2State = { target: null, trackProgress: 0, isLocked: false, afterGaze: null };
+var mode2State = { target: null, trackProgress: 0, isLocked: false, afterGaze: null, totalTrackTime: 0 };
 var mode3State = { target: null };
 var mode4State = { phase: 'reset', target: null };
-var mode5State = { primary: null, ghost: null, ghostTimer: 0, returnTimer: 0, trackingPrimary: false };
-var mode6State = { phase: 'display', sequence: [], currentIndex: 0, displayIndex: 0, displayTimer: 0, delayTimer: 0, spawnTime: 0 };
+var mode5State = { primary: null, ghost: null, ghostTimer: 0, returnTimer: 0, trackingPrimary: false, integrity: 1.0, totalTrackTime: 0 };
+var mode6State = { phase: 'waiting', sequence: [], currentIndex: 0, displayIndex: 0, displayTimer: 0, delayTimer: 0, spawnTime: 0, waitTimer: 0, completeTimer: 0 };
 var mode7State = { rule: 'cold', switchTimer: 0, warningActive: false, targets: [], nextSpawnTimer: 0 };
 
 // ==================== MODE 1: GABOR SCOUT ====================
@@ -23,13 +23,19 @@ function spawnMode1Target() {
     var w = canvasWidth;
     var h = canvasHeight;
     var speed = getScaledValue(params.moveSpeed);
+    var targetSize = getScaledValue(params.targetSize);
+    
+    // Update noise system to match target size
+    if (typeof NoiseSystem !== 'undefined') {
+        NoiseSystem.setTargetSize(targetSize);
+    }
     
     mode1State.target = {
         x: margin + Math.random() * (w - margin * 2),
         y: margin + Math.random() * (h - margin * 2),
         vx: (Math.random() - 0.5) * speed * 2,
         vy: (Math.random() - 0.5) * speed * 2,
-        size: getScaledValue(params.targetSize),
+        size: targetSize,
         contrast: getScaledValue(params.contrast),
         spawnTime: performance.now(),
         timeout: getScaledValue(params.timeout)
@@ -84,7 +90,7 @@ function handleMode1Click() {
 
 // ==================== MODE 2: PURE TRACKING ====================
 function initMode2() {
-    mode2State = { target: null, trackProgress: 0, isLocked: false, afterGaze: null };
+    mode2State = { target: null, trackProgress: 0, isLocked: false, afterGaze: null, totalTrackTime: 0 };
     spawnMode2Target();
 }
 
@@ -132,6 +138,16 @@ function updateMode2(timestamp, dt) {
         return;
     }
     
+    // NEW: Check 7 second timeout
+    var age = timestamp - t.spawnTime;
+    if (age > (params.killTimeout || 7000)) {
+        recordTrialResult(false);
+        flashEffect('warn', 'TIMEOUT');
+        playSound('miss');
+        spawnMode2Target();
+        return;
+    }
+    
     // Organic Lissajous movement
     var speed = getScaledValue(params.moveSpeed);
     var complexity = getScaledValue(params.curveComplexity);
@@ -158,14 +174,10 @@ function updateMode2(timestamp, dt) {
     var lockTime = getScaledValue(params.lockTime);
     
     if (dist <= trackRadius) {
-        // Continuous Scoring for Tracking
-        // Add a tiny fractional score every frame we are tracking
-        // This makes score reflect "Time on Target"
-        if (typeof score !== 'undefined') { // Assuming 'score' global variable from engine
-             score += (dt / 1000) * 10; // 10 points per second
-        }
-        
         mode2State.trackProgress += dt / 1000;
+        // NEW: Accumulate tracking time for NCS
+        mode2State.totalTrackTime += dt / 1000;
+        
         if (mode2State.trackProgress >= lockTime) {
             mode2State.trackProgress = lockTime;
             mode2State.isLocked = true;
@@ -181,6 +193,11 @@ function handleMode2Click() {
     
     if (mode2State.isLocked) {
         var rt = performance.now() - mode2State.target.spawnTime;
+        
+        // NEW: Store tracking time in sessionStats for NCS calculation
+        if (!sessionStats.trackingTime) sessionStats.trackingTime = 0;
+        sessionStats.trackingTime += mode2State.totalTrackTime;
+        
         recordTrialResult(true, rt);
         playSound('hit');
         
@@ -214,6 +231,9 @@ function spawnMode3Target() {
     var offsetAngle = Math.random() * Math.PI * 2;
     var offsetDist = Math.random() * maxOffset;
     
+    // NEW: Calculate color similarity based on difficulty
+    var colorSimilarity = getScaledValue(params.colorSimilarity);
+    
     mode3State.target = {
         x: centerX,
         y: centerY,
@@ -221,6 +241,7 @@ function spawnMode3Target() {
         coreY: centerY + Math.sin(offsetAngle) * offsetDist,
         penaltySize: penaltySize,
         coreSize: coreSize,
+        colorSimilarity: colorSimilarity,  // NEW: 0-0.7 range
         spawnTime: performance.now()
     };
 }
@@ -339,7 +360,9 @@ function initMode5() {
         ghost: null,
         ghostTimer: getScaledValue(params.ghostFrequency),
         returnTimer: 0,
-        trackingPrimary: true
+        trackingPrimary: true,
+        integrity: 1.0,  // NEW: Initialize integrity for progress bar
+        totalTrackTime: 0  // NEW: Track time for NCS
     };
 }
 
@@ -384,7 +407,19 @@ function updateMode5(timestamp, dt) {
     
     // Check if tracking primary
     var distToPrimary = getDistance(mouseX, mouseY, p.x, p.y);
+    var wasTracking = mode5State.trackingPrimary;
     mode5State.trackingPrimary = distToPrimary <= p.size + 30;
+    
+    // NEW: Update integrity and tracking time
+    if (mode5State.trackingPrimary) {
+        // Tracking: slow decay (integrity recovery)
+        mode5State.integrity = Math.min(1.0, mode5State.integrity + dt / 1000 * getScaledValue(params.decaySlow));
+        // Accumulate tracking time for NCS
+        mode5State.totalTrackTime += dt / 1000;
+    } else {
+        // Not tracking: fast decay
+        mode5State.integrity = Math.max(0, mode5State.integrity - dt / 1000 * getScaledValue(params.decayFast));
+    }
     
     // Ghost management
     if (!mode5State.ghost) {
@@ -430,6 +465,11 @@ function handleMode5Click() {
         if (distToGhost <= g.size + 10) {
             if (g.isBlue) {
                 var rt = performance.now() - g.spawnTime;
+                
+                // NEW: Store tracking time in sessionStats for NCS calculation
+                if (!sessionStats.trackingTime) sessionStats.trackingTime = 0;
+                sessionStats.trackingTime += mode5State.totalTrackTime;
+                
                 recordTrialResult(true, rt);
                 playSound('hit');
                 mode5State.returnTimer = getScaledValue(CFG.mode5.params.returnWindow);
@@ -448,15 +488,16 @@ function handleMode5Click() {
 // ==================== MODE 6: MEMORY SEQUENCER ====================
 function initMode6() {
     mode6State = {
-        phase: 'display',
+        phase: 'waiting',
         sequence: [],
         currentIndex: 0,
         displayIndex: 0,
         displayTimer: 0,
         delayTimer: 0,
-        spawnTime: 0
+        spawnTime: 0,
+        waitTimer: 1000,
+        completeTimer: 0
     };
-    generateSequence();
 }
 
 function generateSequence() {
@@ -465,13 +506,27 @@ function generateSequence() {
     var spread = getScaledValue(params.spatialSpread);
     var size = getScaledValue(params.targetSize);
     
-    var cx = canvasWidth / 2;
-    var cy = canvasHeight / 2;
+    // UPDATED: Random center point, avoiding UI areas
+    var uiMarginTop = 150;     // Avoid HUD at top
+    var uiMarginBottom = 100;  // Margin at bottom
+    var uiMarginSide = 100;    // Side margins
+    var clusterRadius = getScaledValue(params.clusterRadius);
+    
+    // Calculate safe zone
+    var safeWidth = canvasWidth - uiMarginSide * 2 - clusterRadius * 2;
+    var safeHeight = canvasHeight - uiMarginTop - uiMarginBottom - clusterRadius * 2;
+    
+    // Random center point within safe zone
+    var cx = uiMarginSide + clusterRadius + Math.random() * safeWidth;
+    var cy = uiMarginTop + clusterRadius + Math.random() * safeHeight;
     
     mode6State.sequence = [];
+    
+    // Generate positions in a cluster around center
     for (var i = 0; i < length; i++) {
         var angle = (i / length) * Math.PI * 2 + Math.random() * 0.5;
         var dist = spread * (0.5 + Math.random() * 0.5);
+        
         mode6State.sequence.push({
             x: cx + Math.cos(angle) * dist,
             y: cy + Math.sin(angle) * dist,
@@ -489,6 +544,25 @@ function generateSequence() {
 
 function updateMode6(timestamp, dt) {
     var params = CFG.mode6.params;
+    
+    // Waiting phase (1 second pause between sequences)
+    if (mode6State.phase === 'waiting') {
+        mode6State.waitTimer -= dt;
+        if (mode6State.waitTimer <= 0) {
+            generateSequence();
+        }
+        return;
+    }
+    
+    // Complete phase (show all completed targets briefly)
+    if (mode6State.phase === 'complete') {
+        mode6State.completeTimer -= dt;
+        if (mode6State.completeTimer <= 0) {
+            mode6State.phase = 'waiting';
+            mode6State.waitTimer = 1000;
+        }
+        return;
+    }
     
     if (mode6State.phase === 'display') {
         mode6State.displayTimer += dt;
@@ -532,14 +606,20 @@ function handleMode6Click() {
             var rt = performance.now() - mode6State.spawnTime;
             recordTrialResult(true, rt);
             sessionStats.perfectTrials++;
-            generateSequence();
+            
+            // FIXED: Show completion feedback before next sequence
+            mode6State.phase = 'complete';
+            mode6State.completeTimer = 500;  // 0.5 second to see all green targets
         }
     } else {
         recordTrialResult(false);
         sessionStats.sequenceErrors++;
         flashEffect('penalty', 'WRONG ORDER');
         playSound('error');
-        generateSequence();
+        
+        // Immediate wait after failure
+        mode6State.phase = 'waiting';
+        mode6State.waitTimer = 1000;
     }
 }
 

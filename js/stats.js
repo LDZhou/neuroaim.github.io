@@ -1,7 +1,7 @@
 // ==================== STATS MODULE ====================
 // Pure statistics tracking - no scoring
 // Separate strobe/non-strobe statistics
-// MODIFIED: Restored full logic + Added NCS (Neuro-Cognitive Score)
+// UPDATED: NCS includes tracking time bonus for Mode 2 and 5
 
 const STATS_KEY = 'neuroaim_stats_v3';
 
@@ -31,12 +31,11 @@ function saveGameStats(session) {
     }
 }
 
-// ===== NCS CALCULATION (NEW) =====
+// ===== NCS CALCULATION (UPDATED WITH TRACKING BONUS) =====
 function calculateNCS(s) {
     if (!s.trials || s.trials === 0) return 0;
     
     // 1. Difficulty Base (1000 pts per 1.0 diff)
-    // Uses average difficulty of the session
     const avgDiff = ((s.startDifficulty || 0.3) + (s.endDifficulty || 0.3)) / 2;
     const baseScore = avgDiff * 1000;
     
@@ -46,14 +45,22 @@ function calculateNCS(s) {
     
     // 3. Speed Factor (Multiplier)
     // 400ms base RT. Faster = bonus, Slower = penalty.
-    // Capped to prevent exploiting blind clicking.
     const rt = s.avgRt || 1000;
     const speedFactor = 400 / (Math.max(150, rt) + 50);
     
     // 4. Strobe Bonus (1.2x if Strobe enabled)
     const strobeBonus = s.strobe ? 1.2 : 1.0;
     
-    return Math.round(baseScore * accWeight * speedFactor * strobeBonus);
+    // 5. NEW: Tracking Time Bonus (for Mode 2 and 5)
+    let trackingBonus = 1.0;
+    if ((s.mode === 2 || s.mode === 5) && s.trackingTime) {
+        // Reward sustained tracking
+        // Each second of tracking adds 0.5% bonus (capped at 50% = 100 seconds)
+        const bonusPercent = Math.min(0.5, s.trackingTime * 0.005);
+        trackingBonus = 1.0 + bonusPercent;
+    }
+    
+    return Math.round(baseScore * accWeight * speedFactor * strobeBonus * trackingBonus);
 }
 
 // ===== MODE METADATA =====
@@ -138,10 +145,8 @@ function updateStatsDisplay() {
     const stats = loadStats();
     const container = document.getElementById('stats-screen');
     
-    // Ensure container exists logic
     if (!container) return;
     
-    // Retain header if it exists
     const header = container.querySelector('.stats-header');
     container.innerHTML = '';
     if(header) container.appendChild(header);
@@ -160,10 +165,8 @@ function updateStatsDisplay() {
     const mainContent = document.createElement('div');
     mainContent.className = 'stats-main-content';
     
-    // Summary cards
     mainContent.innerHTML += createOverallSummary(stats);
     
-    // Mode tabs
     mainContent.innerHTML += `
         <div class="stats-mode-tabs">
             <button class="mode-tab active" data-mode="all" onclick="switchStatsTab('all')">OVERVIEW</button>
@@ -175,9 +178,8 @@ function updateStatsDisplay() {
     `;
     
     container.appendChild(mainContent);
-    switchStatsTab('all'); // Trigger default tab
+    switchStatsTab('all');
     
-    // Clear button
     const clearBtn = document.createElement('button');
     clearBtn.className = 'clear-data-btn';
     clearBtn.innerText = "CLEAR ALL DATA";
@@ -214,8 +216,9 @@ function createOverallSummary(stats) {
     const strobeSessions = stats.filter(s => s.strobe).length;
     const avgEndDiff = calculateAvg(stats, 'endDifficulty');
     
-    // Calculate AVG NCS
-    const avgNCS = calculateAvg(stats, 'ncs');
+    // Calculate AVG NCS (recalculate for old sessions)
+    const ncsScores = stats.map(s => s.ncs || calculateNCS(s));
+    const avgNCS = ncsScores.length > 0 ? Math.round(ncsScores.reduce((a, b) => a + b, 0) / ncsScores.length) : 0;
     
     return `
         <div class="stats-summary-grid">
@@ -271,7 +274,11 @@ function createOverviewContent(stats) {
         
         const normalSessions = filterSessions(stats, mode, false);
         const strobeSessions = filterSessions(stats, mode, true);
-        const avgNCS = calculateAvg(modeSessions, 'ncs');
+        
+        // Recalculate NCS for old sessions
+        const ncsScores = modeSessions.map(s => s.ncs || calculateNCS(s));
+        const avgNCS = ncsScores.length > 0 ? Math.round(ncsScores.reduce((a, b) => a + b, 0) / ncsScores.length) : 0;
+        
         const avgAcc = calculateAvg(modeSessions, 'accuracy');
         const avgRt = calculateAvg(modeSessions, 'avgRt');
         const trend = calculateTrend(modeSessions, 'accuracy');
@@ -303,7 +310,6 @@ function createOverviewContent(stats) {
     
     html += '</div>';
     
-    // Recent sessions
     html += '<h3 class="section-title">RECENT SESSIONS</h3>';
     html += createSessionsTable(stats.slice(-15).reverse());
     
@@ -338,7 +344,6 @@ function createModeDetailContent(stats, mode) {
         </div>
     `;
     
-    // Strobe vs Normal comparison
     html += '<h4 class="subsection-title">NORMAL vs STROBE (NCS SCORES)</h4>';
     html += '<div class="strobe-comparison">';
     
@@ -354,7 +359,9 @@ function createModeDetailContent(stats, mode) {
             return;
         }
         
-        const avgNCS = calculateAvg(sessions, 'ncs');
+        const ncsScores = sessions.map(s => s.ncs || calculateNCS(s));
+        const avgNCS = ncsScores.length > 0 ? Math.round(ncsScores.reduce((a, b) => a + b, 0) / ncsScores.length) : 0;
+        
         const avgAcc = calculateAvg(sessions, 'accuracy');
         const avgRt = calculateAvg(sessions, 'avgRt');
         const avgDiff = calculateAvg(sessions, 'endDifficulty');
@@ -386,15 +393,12 @@ function createModeDetailContent(stats, mode) {
     
     html += '</div>';
     
-    // Difficulty progression chart
     html += '<h4 class="subsection-title">DIFFICULTY PROGRESSION</h4>';
     html += createDifficultyChart(modeSessions, mode);
     
-    // Mode-specific stats
     html += '<h4 class="subsection-title">MODE-SPECIFIC METRICS</h4>';
     html += createModeSpecificStats(modeSessions, mode);
     
-    // Recent sessions for this mode
     html += '<h4 class="subsection-title">RECENT SESSIONS</h4>';
     html += createSessionsTable(modeSessions.slice(-10).reverse(), true);
     
@@ -417,9 +421,10 @@ function createDifficultyChart(sessions, mode) {
         const diff = s.endDifficulty || 0.3;
         const height = diff * 90 + 5;
         const barColor = s.strobe ? '#ff66cc' : color;
+        const ncs = s.ncs || calculateNCS(s);
         bars += `
             <div class="chart-bar" style="width: ${width}%; height: ${height}%; background: ${barColor}" 
-                 title="NCS: ${s.ncs || 0} | ${Math.round(diff * 100)}% (${s.strobe ? 'Strobe' : 'Normal'})"></div>
+                 title="NCS: ${ncs} | ${Math.round(diff * 100)}% (${s.strobe ? 'Strobe' : 'Normal'})"></div>
         `;
     });
     
@@ -446,10 +451,15 @@ function createModeSpecificStats(sessions, mode) {
     switch(mode) {
         case 2: // Tracking
             const avgGaze = calculateAvg(sessions.filter(s => s.gazeBreaks !== undefined), 'gazeBreaks');
+            const avgTrackTime = calculateAvg(sessions.filter(s => s.trackingTime !== undefined), 'trackingTime');
             html += `
                 <div class="specific-stat">
                     <span class="stat-value">${avgGaze}</span>
                     <span class="stat-label">Avg Gaze Breaks</span>
+                </div>
+                <div class="specific-stat">
+                    <span class="stat-value">${avgTrackTime.toFixed(1)}s</span>
+                    <span class="stat-label">Avg Tracking Time</span>
                 </div>
             `;
             break;
@@ -466,6 +476,7 @@ function createModeSpecificStats(sessions, mode) {
             const inhibSuccess = sessions.reduce((a, s) => a + (s.inhibitionSuccess || 0), 0);
             const inhibFail = sessions.reduce((a, s) => a + (s.inhibitionFail || 0), 0);
             const inhibRate = inhibSuccess + inhibFail > 0 ? Math.round(inhibSuccess / (inhibSuccess + inhibFail) * 100) : 0;
+            const avgTrackTime5 = calculateAvg(sessions.filter(s => s.trackingTime !== undefined), 'trackingTime');
             html += `
                 <div class="specific-stat">
                     <span class="stat-value">${inhibRate}%</span>
@@ -474,6 +485,10 @@ function createModeSpecificStats(sessions, mode) {
                 <div class="specific-stat">
                     <span class="stat-value">${inhibFail}</span>
                     <span class="stat-label">False Positives</span>
+                </div>
+                <div class="specific-stat">
+                    <span class="stat-value">${avgTrackTime5.toFixed(1)}s</span>
+                    <span class="stat-label">Avg Tracking Time</span>
                 </div>
             `;
             break;
@@ -507,7 +522,6 @@ function createModeSpecificStats(sessions, mode) {
             }
     }
     
-    // RT consistency
     const avgStdDev = calculateAvg(sessions.filter(s => s.rtStdDev), 'rtStdDev');
     if (avgStdDev > 0) {
         html += `
@@ -548,7 +562,7 @@ function createSessionsTable(sessions, hideMode = false) {
         const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         const modeColor = MODE_COLORS[s.mode] || '#fff';
         const diffChange = (s.endDifficulty || 0.3) - (s.startDifficulty || 0.3);
-        const ncs = s.ncs || calculateNCS(s); // Calc on fly if old data
+        const ncs = s.ncs || calculateNCS(s);
         
         html += `
             <tr>

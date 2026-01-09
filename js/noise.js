@@ -1,6 +1,7 @@
 // ==================== NOISE SYSTEM ====================
 // Visual noise layers and strobe system
 // UPDATED: Strobe as toggle, simplified noise levels
+// UPDATED: Gabor size matches target, consistent opacity
 
 const NoiseSystem = {
     particles: [],
@@ -12,10 +13,12 @@ const NoiseSystem = {
     currentStrobePeriod: 0,
     isBlindPhase: false,
     gaborCache: null,
+    currentTargetSize: 45,  // UPDATED: Default to mode1 initial size (45px)
     
     init(width, height) {
         this.w = width;
         this.h = height;
+        this.currentTargetSize = 45;  // Reset to default on init
         this.createGaborCache();
         this.regenerate();
     },
@@ -31,8 +34,16 @@ const NoiseSystem = {
         }
     },
     
+    setTargetSize(size) {
+        this.currentTargetSize = size;
+        this.createGaborCache();
+        // IMPORTANT: Regenerate particles with new size
+        this.regenerate();
+    },
+    
     createGaborCache() {
-        const baseSize = 40;
+        // UPDATED: Use currentTargetSize instead of fixed baseSize
+        const baseSize = this.currentTargetSize || CFG.noise.gaborField.baseSize || 35;
         const canvasSize = baseSize * 3;
         const cx = canvasSize / 2;
         const cy = canvasSize / 2;
@@ -42,13 +53,8 @@ const NoiseSystem = {
         this.gaborCache.height = canvasSize;
         const ctx = this.gaborCache.getContext('2d');
         
-        // Use circular clipping
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseSize, 0, Math.PI * 2);
-        ctx.clip();
-        
-        // Draw lines
-        ctx.strokeStyle = 'rgb(150, 150, 150)';
+        // Step 1: Draw grating pattern
+        ctx.strokeStyle = 'rgb(180, 180, 180)';
         ctx.lineWidth = 3;
         const step = 6;
         
@@ -58,6 +64,16 @@ const NoiseSystem = {
             ctx.lineTo(cx + i, canvasSize);
         }
         ctx.stroke();
+        
+        // Step 2: Apply Gaussian envelope (高斯模糊) - Match target's blur
+        ctx.globalCompositeOperation = 'destination-in';
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseSize * 1.0);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');      // Full opacity at center
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.7)');    // Stronger Gaussian falloff
+        gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.3)');    // More gradual fade
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');        // Transparent at edge
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvasSize, canvasSize);
     },
     
     regenerate() {
@@ -69,7 +85,14 @@ const NoiseSystem = {
         const counts = { 1: 30, 2: 80, 3: 150, 4: 200 };
         const count = counts[this.noiseLevel] || 50;
         
+        // UPDATED: Use currentTargetSize as base
+        const baseSize = this.currentTargetSize || CFG.noise.gaborField.baseSize || 35;
+        const sizeVar = CFG.noise.gaborField.sizeVariance || 8;
+        
         for (let i = 0; i < count; i++) {
+            // Size matches target ± small variance
+            const size = baseSize + (Math.random() - 0.5) * sizeVar;
+            
             this.particles.push({
                 x: Math.random() * this.w,
                 y: Math.random() * this.h,
@@ -78,7 +101,7 @@ const NoiseSystem = {
                 changeDirTimer: Math.random() * 3000,
                 angle: Math.random() * Math.PI,
                 isHorizontal: Math.random() > 0.3, // 70% horizontal (distractors)
-                size: 30 + Math.random() * 20,
+                size: size,
                 type: 'gabor'
             });
         }
@@ -133,10 +156,11 @@ const NoiseSystem = {
             return;
         }
         
-        // Draw noise particles
-        const alpha = Math.min(1, 0.3 + this.noiseLevel * 0.2);
+        // UPDATED: Match target's opacity range (0.5-0.7 for consistency)
+        const baseAlpha = 0.6;  // Slightly visible to create challenge
+        
         ctx.save();
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = baseAlpha;
         
         this.particles.forEach(p => {
             if (p.type === 'gabor' && this.gaborCache) {

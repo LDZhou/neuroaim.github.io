@@ -25,7 +25,7 @@ body {
     font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
     overflow-x: hidden;
-    cursor: none;
+    cursor: default;
 }
 
 /* ===== BACKGROUND GRID ===== */
@@ -525,6 +525,7 @@ body {
 /* ===== GAME SCREEN ===== */
 #game-screen {
     position: fixed;
+    cursor: none;
     top: 0; left: 0; right: 0; bottom: 0;
 }
 

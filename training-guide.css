@@ -1,0 +1,706 @@
+/* ==================== TRAINING GUIDE MODAL ==================== */
+.training-guide-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.training-guide-modal.hidden {
+    display: none;
+}
+
+.training-guide-content {
+    background: linear-gradient(145deg, #0a0f1a 0%, #0d1520 100%);
+    border: 1px solid #00d9ff33;
+    border-radius: 16px;
+    max-width: 1000px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 30px;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0, 217, 255, 0.15);
+}
+
+.training-guide-content h2 {
+    font-family: 'Orbitron', sans-serif;
+    color: #00d9ff;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+}
+
+.training-guide-content h3 {
+    font-family: 'Orbitron', sans-serif;
+    color: #00d9ff;
+    font-size: 1.3rem;
+    margin: 20px 0 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #00d9ff33;
+}
+
+.training-guide-content h4 {
+    font-family: 'JetBrains Mono', monospace;
+    color: #fff;
+    font-size: 1rem;
+    margin: 20px 0 10px;
+}
+
+.training-guide-content h5 {
+    font-family: 'JetBrains Mono', monospace;
+    color: #00d9ff;
+    font-size: 0.9rem;
+    margin: 10px 0 5px;
+}
+
+.training-guide-content p {
+    color: #aab;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.training-guide-content ul {
+    color: #aab;
+    padding-left: 20px;
+    margin-bottom: 15px;
+}
+
+.training-guide-content li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.training-guide-content strong {
+    color: #fff;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: transparent;
+    border: 1px solid #ff446633;
+    color: #ff4466;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+    background: #ff446622;
+    border-color: #ff4466;
+}
+
+/* Tab Navigation */
+.guide-tabs {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 25px;
+    padding: 5px;
+    background: #0005;
+    border-radius: 10px;
+}
+
+.guide-tab {
+    background: transparent;
+    border: 1px solid #00d9ff33;
+    color: #889;
+    padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+}
+
+.guide-tab:hover {
+    border-color: #00d9ff66;
+    color: #00d9ff;
+}
+
+.guide-tab.active {
+    background: #00d9ff22;
+    border-color: #00d9ff;
+    color: #00d9ff;
+}
+
+/* Guide Sections */
+.guide-section {
+    display: none;
+}
+
+.guide-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.guide-intro {
+    font-size: 1rem;
+    color: #bbc;
+    margin-bottom: 20px;
+}
+
+/* Neural Pathways Grid */
+.pathway-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.pathway-card {
+    background: #ffffff08;
+    border: 1px solid #ffffff15;
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s ease;
+}
+
+.pathway-card:hover {
+    border-color: #00d9ff44;
+    background: #00d9ff08;
+}
+
+.pathway-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.pathway-icon {
+    font-size: 1.5rem;
+}
+
+.pathway-header h4 {
+    margin: 0;
+    color: #00d9ff;
+    font-size: 0.95rem;
+}
+
+.pathway-regions {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: #ff8844;
+    margin-bottom: 8px;
+    padding: 5px 8px;
+    background: #ff884411;
+    border-radius: 4px;
+}
+
+.pathway-function {
+    font-size: 0.85rem;
+    color: #aab;
+    margin-bottom: 10px;
+}
+
+.pathway-trained, .pathway-fps {
+    font-size: 0.8rem;
+    color: #889;
+    margin-bottom: 5px;
+}
+
+.pathway-trained strong, .pathway-fps strong {
+    color: #00ff99;
+}
+
+/* Improvement Timeline */
+.improvement-timeline {
+    margin: 20px 0;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-left: 10px;
+}
+
+.timeline-marker {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #00d9ff22;
+    border: 2px solid #00d9ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    color: #00d9ff;
+    flex-shrink: 0;
+}
+
+.timeline-marker.warning {
+    background: #ff884422;
+    border-color: #ff8844;
+    color: #ff8844;
+    font-size: 1.5rem;
+}
+
+.timeline-marker.sleep {
+    background: #8844ff22;
+    border-color: #8844ff;
+    font-size: 1.2rem;
+}
+
+.timeline-content {
+    flex: 1;
+}
+
+.timeline-content h4 {
+    color: #fff;
+    margin: 0 0 8px 0;
+}
+
+.timeline-content p {
+    margin: 0;
+}
+
+/* Sleep Tips */
+.sleep-tips {
+    background: #8844ff15;
+    border: 1px solid #8844ff44;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-top: 20px;
+}
+
+.sleep-tips h4 {
+    color: #8844ff;
+    margin-top: 0;
+}
+
+/* Protocol Section */
+.protocol-principles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.principle {
+    background: #ffffff08;
+    border-left: 3px solid #00d9ff;
+    padding: 15px;
+    border-radius: 0 8px 8px 0;
+}
+
+.principle h4 {
+    color: #00d9ff;
+    margin: 0 0 8px 0;
+    font-size: 0.9rem;
+}
+
+.principle p {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Mode Recommendations */
+.mode-recommendations {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 15px 0 25px;
+}
+
+.mode-rec {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    background: #ffffff05;
+    border: 1px solid #ffffff10;
+    border-radius: 8px;
+    padding: 12px 15px;
+}
+
+.mode-rec-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    color: #00d9ff;
+    opacity: 0.5;
+    min-width: 35px;
+}
+
+.mode-rec-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.mode-rec-info strong {
+    color: #fff;
+    min-width: 150px;
+}
+
+.rec-duration {
+    background: #00ff9922;
+    color: #00ff99;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.rec-freq {
+    background: #00d9ff22;
+    color: #00d9ff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.mode-rec p {
+    width: 100%;
+    margin: 8px 0 0 50px;
+    font-size: 0.8rem;
+    color: #889;
+}
+
+/* Sample Routines */
+.sample-routines {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.routine-card {
+    background: linear-gradient(135deg, #00d9ff11 0%, #00ff9911 100%);
+    border: 1px solid #00d9ff33;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.routine-card h5 {
+    margin: 0 0 10px 0;
+}
+
+.routine-flow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: #00ff99;
+    background: #00000033;
+    padding: 8px 12px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.routine-card p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #889;
+}
+
+/* Protocol Warnings */
+.protocol-warnings {
+    background: #ff446615;
+    border: 1px solid #ff446644;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-top: 20px;
+}
+
+.protocol-warnings h4 {
+    color: #ff4466;
+    margin-top: 0;
+}
+
+/* Strobe Section */
+.strobe-overview {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.strobe-what, .strobe-how {
+    background: #ffffff08;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.strobe-how {
+    background: #00ff9915;
+    border: 1px solid #00ff9944;
+}
+
+.strobe-what h4, .strobe-how h4 {
+    margin-top: 0;
+}
+
+.strobe-benefits {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.strobe-benefit {
+    background: #ffffff08;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.strobe-benefit h5 {
+    margin-top: 0;
+}
+
+.strobe-benefit p {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+.strobe-science {
+    background: #00d9ff11;
+    border-left: 3px solid #00d9ff;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.strobe-science h4 {
+    margin-top: 0;
+    color: #00d9ff;
+}
+
+.strobe-recommendations {
+    margin: 20px 0;
+}
+
+.strobe-warnings {
+    background: #ff446615;
+    border: 1px solid #ff446644;
+    border-radius: 10px;
+    padding: 15px 20px;
+}
+
+.strobe-warnings h4 {
+    color: #ff4466;
+    margin-top: 0;
+}
+
+/* Adaptive Section */
+.adaptive-concept {
+    background: #ffffff08;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.adaptive-concept h4 {
+    margin-top: 0;
+}
+
+.adaptive-diagram {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 25px 0;
+}
+
+.zone {
+    padding: 20px 25px;
+    text-align: center;
+    flex: 1;
+    max-width: 200px;
+}
+
+.zone span {
+    display: block;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+}
+
+.zone p {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.zone-easy {
+    background: #44444433;
+    border-radius: 10px 0 0 10px;
+    border: 1px solid #44444466;
+}
+
+.zone-easy span { color: #888; }
+
+.zone-optimal {
+    background: #00ff9922;
+    border: 2px solid #00ff99;
+    transform: scale(1.05);
+    z-index: 1;
+    border-radius: 10px;
+}
+
+.zone-optimal span { color: #00ff99; }
+
+.zone-hard {
+    background: #ff446622;
+    border-radius: 0 10px 10px 0;
+    border: 1px solid #ff446666;
+}
+
+.zone-hard span { color: #ff4466; }
+
+.adaptive-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.adaptive-step {
+    background: #ffffff08;
+    border-radius: 8px;
+    padding: 15px;
+    position: relative;
+}
+
+.step-num {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    width: 30px;
+    height: 30px;
+    background: #00d9ff;
+    color: #000;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.adaptive-step h5 {
+    margin: 5px 0 10px 15px;
+}
+
+.adaptive-step p {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+.adaptive-settings {
+    background: #00d9ff11;
+    border: 1px solid #00d9ff33;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin: 20px 0;
+}
+
+.adaptive-settings h4 {
+    margin-top: 0;
+    color: #00d9ff;
+}
+
+.adaptive-settings table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.adaptive-settings td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #ffffff15;
+}
+
+.adaptive-settings td:first-child {
+    color: #889;
+}
+
+.adaptive-settings td:last-child {
+    color: #00d9ff;
+    text-align: right;
+}
+
+.adaptive-why, .adaptive-tips {
+    margin: 20px 0;
+}
+
+/* Scrollbar Styling */
+.training-guide-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.training-guide-content::-webkit-scrollbar-track {
+    background: #0a0f1a;
+}
+
+.training-guide-content::-webkit-scrollbar-thumb {
+    background: #00d9ff44;
+    border-radius: 4px;
+}
+
+.training-guide-content::-webkit-scrollbar-thumb:hover {
+    background: #00d9ff66;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .training-guide-content {
+        padding: 20px 15px;
+    }
+    
+    .guide-tabs {
+        flex-direction: column;
+    }
+    
+    .guide-tab {
+        min-width: auto;
+    }
+    
+    .pathway-grid,
+    .strobe-overview,
+    .adaptive-diagram {
+        grid-template-columns: 1fr;
+    }
+    
+    .adaptive-diagram {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .zone {
+        max-width: none;
+        width: 100%;
+    }
+    
+    .zone-easy { border-radius: 10px 10px 0 0; }
+    .zone-hard { border-radius: 0 0 10px 10px; }
+    
+    .mode-rec {
+        flex-direction: column;
+    }
+    
+    .mode-rec p {
+        margin-left: 0;
+    }
+}

@@ -24,7 +24,7 @@ const CFG = {
         tag: 'V1 CORTEX + PERCEPTION',
         description: 'Identify <strong>Vertical</strong> targets in noise.',
         params: {
-            targetSize: { min: 60, max: 30 },        
+            targetSize: { min: 45, max: 20 },        // REDUCED: More challenging size range
             moveSpeed: { min: 2, max: 8 },           
             contrast: { min: 1.0, max: 0.15 },       
             noiseCount: { min: 20, max: 200 },       
@@ -43,7 +43,8 @@ const CFG = {
             lockTime: { min: 0.6, max: 1.5 },        
             afterGazeTime: { min: 300, max: 800 },   
             gazeRadius: { min: 80, max: 40 },        
-            curveComplexity: { min: 1, max: 3 }      
+            curveComplexity: { min: 1, max: 3 },
+            killTimeout: 7000                         // NEW: 7 second timeout for kill
         }
     },
     
@@ -51,13 +52,14 @@ const CFG = {
     mode3: {
         name: 'SURGICAL LOCK',
         tag: 'PREMOTOR + INHIBITION',
-        description: 'Hit <span style="color:#00d9ff">Core</span>. Avoid <span style="color:#aaa">Halo</span>. Precision over speed.',
+        description: 'Hit <span style="color:#ffcc00">Yellow Core</span>. Avoid <span style="color:#ffb400">Orange Halo</span>. Precision over speed.',
         params: {
             coreSize: { min: 12, max: 4 },           
             penaltySize: { min: 60, max: 35 },       
             coreOffset: { min: 0.3, max: 0.9 },      
             decoyCount: { min: 0, max: 8 },          
-            decoyMovement: { min: 0, max: 3 }        
+            decoyMovement: { min: 0, max: 3 },
+            colorSimilarity: { min: 0, max: 0.9 }    // UPDATED: 0=distinct, 0.9=very similar (linear)
         }
     },
     
@@ -90,7 +92,8 @@ const CFG = {
             returnWindow: { min: 1500, max: 600 },
             decayNormal: { min: 0.8, max: 1.5 },     
             decaySlow: { min: 0.2, max: 0.4 },       
-            decayFast: { min: 2.0, max: 4.0 } 
+            decayFast: { min: 2.0, max: 4.0 },
+            trackingRequirement: 0.6                  // NEW: 60% tracking time required
         }
     },
     
@@ -118,8 +121,8 @@ const CFG = {
         params: {
             targetSize: { min: 40, max: 22 },
             moveSpeed: { min: 3, max: 8 },
-            switchInterval: { min: 15000, max: 8000 }, // UPDATED: Much slower switching (8-15s)
-            warningTime: { min: 4000, max: 4000 },     // UPDATED: Fixed 4s warning for consistent countdown
+            switchInterval: { min: 15000, max: 8000 }, 
+            warningTime: { min: 4000, max: 4000 },     
             targetFrequency: { min: 2000, max: 800 }, 
             inhibitionRatio: { min: 0.3, max: 0.5 }  
         }
@@ -135,18 +138,20 @@ const CFG = {
     noise: {
         baseSpeed: 6,
         gaborField: {
-            baseSize: 40
+            baseSize: 35,              // UPDATED: Closer to target size
+            sizeVariance: 8            // NEW: ±8px variance
         }
     }
 };
 
-// ==================== MODE INFO (FULL TEXT RESTORED) ====================
+// ==================== MODE INFO (FULL TEXT) ====================
 const MODE_INFO = {
     1: {
         title: 'GABOR SCOUT',
         howTo: [
             'Click <strong>Vertical</strong> Gabor patches only.',
             'Ignore horizontal/diagonal distractors.',
+            'All patches use Gaussian envelopes for authentic V1 simulation.',
             'Difficulty adapts: size, contrast, speed, noise density.',
             'Enable <span class="highlight">Strobe</span> in settings for temporal challenge.'
         ],
@@ -156,7 +161,7 @@ const MODE_INFO = {
             'Crowding Resistance',
             'Temporal Visual Processing'
         ],
-        science: `Targets the <strong>primary visual cortex (V1)</strong> where orientation-selective neurons reside. The Gabor noise field mimics natural visual clutter, forcing your V1 to enhance signal-to-noise ratio. Adaptive difficulty ensures you're always in the optimal learning zone (i+1 principle).`
+        science: `Targets the <strong>primary visual cortex (V1)</strong> where orientation-selective neurons reside. Uses authentic Gabor patches with Gaussian envelopes to match V1 receptive fields. The noise field mimics natural visual clutter, forcing your V1 to enhance signal-to-noise ratio. Adaptive difficulty ensures you're always in the optimal learning zone (i+1 principle).`
     },
     2: {
         title: 'PURE TRACKING',
@@ -171,17 +176,17 @@ const MODE_INFO = {
             'Smooth Pursuit Eye Movement',
             'Cerebellar Motor Prediction',
             'MT/V5 Motion Processing',
-            'Post-Shot Stability (Recoil Control)'
+            'Target Transition Discipline'
         ],
-        science: `Engages the <strong>cerebellum</strong> and <strong>area MT/V5</strong> for predictive motion tracking. The organic Lissajous movement prevents simple linear extrapolation, forcing your brain to build <strong>complex internal motion models</strong>. The afterGaze requirement trains <strong>post-saccadic suppression control</strong>.`
+        science: `Engages the <strong>cerebellum</strong> and <strong>area MT/V5</strong> for predictive motion tracking. The organic Lissajous movement prevents simple linear extrapolation, forcing your brain to build <strong>complex internal motion models</strong>. The <strong>afterGaze requirement</strong> trains you to resist the common habit of prematurely switching to the next target — in real gameplay, this prevents "panic flicking" and ensures confirmed kills before transitioning. This discipline is critical for multi-target engagements.`
     },
     3: {
         title: 'SURGICAL LOCK',
         howTo: [
-            'Hit the <span style="color:#00d9ff">cyan core</span> precisely.',
-            'Avoid the <span style="color:#aaa">penalty halo</span>.',
+            'Hit the <span style="color:#ffcc00">yellow core</span> precisely.',
+            'Avoid the <span style="color:#ffb400">orange-yellow halo</span>.',
             '<span class="warn">Core position is RANDOM within halo!</span>',
-            'Decoys appear at higher difficulty.',
+            'At high difficulty: colors converge to identical yellow + both fade (min 5% opacity).',
             'Pure precision — no time pressure.'
         ],
         improves: [ 
@@ -190,7 +195,7 @@ const MODE_INFO = {
             'Superior Colliculus Targeting',
             'Impulse Control'
         ],
-        science: `A high-precision <strong>Fitts' Law</strong> task targeting the <strong>premotor cortex</strong> and <strong>superior colliculus</strong>. The random core placement prevents muscle memory, forcing active <strong>foveal acquisition</strong> on every trial.`
+        science: `A high-precision <strong>Fitts' Law</strong> task targeting the <strong>premotor cortex</strong> and <strong>superior colliculus</strong>. The random core placement prevents muscle memory, forcing active <strong>foveal acquisition</strong> on every trial. At extreme difficulty (90%), color similarity and opacity decay create a visual challenge requiring exceptional discrimination and impulse control.`
     },
     4: {
         title: 'LANDOLT SACCADE',
@@ -202,12 +207,12 @@ const MODE_INFO = {
             'Direction = where the <strong>gap</strong> is pointing.'
         ],
         improves: [ 
-            'Saccadic Eye Movement Speed',
-            'Visual Discrimination Under Pressure',
-            'Visuomotor Translation (WASD Mapping)',
+            'Peripheral-to-Foveal Acquisition Speed',
+            'Saccadic Target Identification',
+            'Pre-Shot Visual Processing',
             'Frontal Eye Field Activation'
         ],
-        science: `Combines <strong>saccadic targeting</strong> with <strong>forced visual discrimination</strong>. The Landolt C optotype requires foveal resolution to identify gap direction. The WASD response forces <strong>visuomotor translation</strong>: visual percept → cognitive decision → motor command.`
+        science: `Trains the critical <strong>peripheral detection → saccade → foveal identification</strong> pipeline. In FPS, you first detect an enemy in peripheral vision, then your eyes saccade to acquire them, and finally your fovea must resolve target details (friend/foe, hitbox position) before firing. This mode specifically accelerates that entire chain. The Landolt C forces <strong>foveal resolution</strong> — you cannot identify the gap direction peripherally, simulating how precise target identification requires direct fixation. Faster completion = faster "time to first shot" in real gameplay.`
     },
     5: {
         title: 'PARAFOVEAL GHOST',
@@ -259,6 +264,236 @@ const MODE_INFO = {
             'Inhibitory Control'
         ],
         science: `Targets the <strong>anterior cingulate cortex (ACC)</strong> for conflict monitoring and <strong>prefrontal cortex</strong> for rule maintenance. Simulates the cognitive demands of rapidly changing combat situations where "friend vs foe" rules shift (e.g., mode switches, ability cooldowns).`
+    }
+};
+
+// ==================== TRAINING GUIDE ====================
+const TRAINING_GUIDE = {
+    // ===== NEURAL PATHWAYS & TRAINING MODES =====
+    neuralPathways: {
+        title: 'NEURAL PATHWAYS OF AIMING',
+        description: 'Different aiming skills rely on distinct neural circuits. Understanding these pathways helps you train systematically.',
+        pathways: [
+            {
+                name: 'Visual Detection Pipeline',
+                regions: ['V1 (Primary Visual Cortex)', 'V4 (Color/Form)', 'MT/V5 (Motion)'],
+                function: 'Initial target detection, distinguishing targets from background, motion perception',
+                trainedBy: ['Mode 1: Gabor Scout', 'Mode 5: Parafoveal Ghost'],
+                fpsApplication: 'Spotting enemies in cluttered environments, detecting movement'
+            },
+            {
+                name: 'Saccadic Targeting System',
+                regions: ['Frontal Eye Fields (FEF)', 'Superior Colliculus', 'Parietal Cortex'],
+                function: 'Rapid eye movements to acquire targets, coordinate eye-hand movements',
+                trainedBy: ['Mode 4: Landolt Saccade', 'Mode 5: Parafoveal Ghost'],
+                fpsApplication: 'Flick shots, quick target acquisition, scanning for enemies'
+            },
+            {
+                name: 'Smooth Pursuit & Prediction',
+                regions: ['Cerebellum', 'MT/V5', 'Supplementary Eye Fields'],
+                function: 'Tracking moving targets, predicting future positions',
+                trainedBy: ['Mode 2: Pure Tracking'],
+                fpsApplication: 'Tracking strafing enemies, leading shots, spray control'
+            },
+            {
+                name: 'Precision Motor Control',
+                regions: ['Premotor Cortex', 'Primary Motor Cortex', 'Basal Ganglia'],
+                function: 'Fine motor adjustments, stopping movement precisely',
+                trainedBy: ['Mode 3: Surgical Lock'],
+                fpsApplication: 'Micro-adjustments, headshot precision, avoiding overflick'
+            },
+            {
+                name: 'Spatial Working Memory',
+                regions: ['Dorsolateral Prefrontal Cortex (dlPFC)', 'Posterior Parietal Cortex'],
+                function: 'Maintaining spatial positions in memory, multi-target awareness',
+                trainedBy: ['Mode 6: Memory Sequencer'],
+                fpsApplication: 'Tracking multiple enemies, remembering positions through smoke/cover'
+            },
+            {
+                name: 'Executive Control & Flexibility',
+                regions: ['Anterior Cingulate Cortex (ACC)', 'Prefrontal Cortex'],
+                function: 'Rule switching, conflict monitoring, inhibiting wrong responses',
+                trainedBy: ['Mode 7: Cognitive Switch'],
+                fpsApplication: 'Adapting to changing situations, avoiding friendly fire, mode transitions'
+            }
+        ]
+    },
+
+    // ===== WHEN TO EXPECT IMPROVEMENT =====
+    neuroplasticity: {
+        title: 'WHEN WILL I IMPROVE?',
+        keyPoints: [
+            {
+                heading: 'Not Immediately After Training',
+                content: 'Your performance may actually decline immediately after an intense session. This is normal — your neural circuits are fatigued and undergoing reorganization. Do not judge progress by post-session performance.'
+            },
+            {
+                heading: 'Sleep Is When Learning Consolidates',
+                content: 'Neural plasticity — the actual strengthening of synaptic connections — occurs primarily during sleep, especially during REM and slow-wave sleep phases. The brain replays and consolidates motor patterns learned during waking hours. One night of quality sleep can improve performance by 20-30% on motor tasks.'
+            },
+            {
+                heading: 'The 48-72 Hour Window',
+                content: 'Measurable improvement typically appears 1-3 days after training, assuming adequate sleep. This is when neural consolidation completes and new pathways are fully integrated.'
+            },
+            {
+                heading: 'Cumulative Adaptation (2-4 Weeks)',
+                content: 'Structural neural changes (increased myelination, dendritic growth) require consistent training over weeks. Expect significant, stable improvement after 2-4 weeks of regular practice.'
+            },
+            {
+                heading: 'Plateau & Breakthrough Cycles',
+                content: 'Skill development follows a step-function pattern. You will experience plateaus where improvement stalls. Continue training — breakthroughs often occur suddenly after apparent stagnation.'
+            }
+        ],
+        sleepRecommendations: [
+            'Aim for 7-9 hours of sleep per night',
+            'Training before sleep (evening sessions) may enhance consolidation',
+            'Avoid alcohol after training — it disrupts REM sleep and consolidation',
+            'Naps (20-90 min) can accelerate motor learning if sleep-deprived'
+        ]
+    },
+
+    // ===== RECOMMENDED USAGE =====
+    usageProtocol: {
+        title: 'RECOMMENDED TRAINING PROTOCOL',
+        principles: [
+            {
+                name: 'Focused Practice > Marathon Sessions',
+                detail: 'Short, focused sessions (10-20 min per mode) outperform long, fatigued sessions. Quality of attention matters more than total time.'
+            },
+            {
+                name: 'Distributed Practice',
+                detail: 'Multiple short sessions across days beat one long session. Sleep between sessions allows consolidation.'
+            },
+            {
+                name: 'Train Weaknesses, Not Strengths',
+                detail: 'Identify your weakest modes and prioritize them. Comfortable training is often ineffective training.'
+            }
+        ],
+        dailyRecommendations: [
+            {
+                mode: 'Mode 1: Gabor Scout',
+                duration: '5-10 minutes',
+                frequency: '3-4x per week',
+                notes: 'Best as a warm-up. Primes visual cortex for other tasks.'
+            },
+            {
+                mode: 'Mode 2: Pure Tracking',
+                duration: '10-15 minutes',
+                frequency: 'Daily or every other day',
+                notes: 'Core tracking skill. Essential for most FPS games. Can extend to 20 min if tracking is a weakness.'
+            },
+            {
+                mode: 'Mode 3: Surgical Lock',
+                duration: '5-10 minutes',
+                frequency: '3-4x per week',
+                notes: 'Highly demanding. Shorter sessions prevent frustration. Quality over quantity.'
+            },
+            {
+                mode: 'Mode 4: Landolt Saccade',
+                duration: '5-10 minutes',
+                frequency: 'Daily',
+                notes: 'Critical for flick-heavy games (Valorant, CS). Short sessions, high frequency optimal.'
+            },
+            {
+                mode: 'Mode 5: Parafoveal Ghost',
+                duration: '10-15 minutes',
+                frequency: '3-4x per week',
+                notes: 'Cognitively demanding. Avoid when mentally fatigued.'
+            },
+            {
+                mode: 'Mode 6: Memory Sequencer',
+                duration: '5-10 minutes',
+                frequency: '2-3x per week',
+                notes: 'Working memory training. Benefits plateau quickly — diminishing returns after 10 min.'
+            },
+            {
+                mode: 'Mode 7: Cognitive Switch',
+                duration: '5-10 minutes',
+                frequency: '2-3x per week',
+                notes: 'Best done when mentally fresh. Avoid late-night sessions.'
+            }
+        ],
+        sampleRoutines: [
+            {
+                name: 'Quick Warm-Up (15 min)',
+                routine: 'Mode 1 (5 min) → Mode 4 (5 min) → Mode 2 (5 min)',
+                useCase: 'Before ranked games'
+            },
+            {
+                name: 'Full Training Session (45 min)',
+                routine: 'Mode 1 (5 min) → Mode 2 (15 min) → Mode 3 (10 min) → Mode 4 (10 min) → Rest',
+                useCase: 'Dedicated training day'
+            },
+            {
+                name: 'Cognitive Focus (25 min)',
+                routine: 'Mode 5 (10 min) → Mode 7 (10 min) → Mode 6 (5 min)',
+                useCase: 'Training awareness and decision-making'
+            }
+        ],
+        warnings: [
+            'Do NOT train for more than 60 minutes total per day — diminishing returns and fatigue',
+            'Stop if experiencing eye strain, headache, or frustration',
+            'Rest at least 1 day per week (active recovery)',
+            'Avoid training immediately before important matches — temporary fatigue can hurt performance'
+        ]
+    },
+
+    // ===== STROBE MODE =====
+    strobeMode: {
+        title: 'STROBE MODE: TEMPORAL OCCLUSION TRAINING',
+        whatItDoes: 'Strobe mode periodically blacks out the screen (3-6 Hz), forcing your brain to process visual information in discrete snapshots rather than continuous flow.',
+        howToEnable: 'Go to Settings → Strobe Mode → Toggle ON for each mode individually.',
+        benefits: [
+            {
+                benefit: 'Enhanced Visual Memory',
+                explanation: 'When vision is interrupted, your brain must retain the last visual frame longer. This strengthens iconic memory — the brief visual buffer that persists after stimuli disappear.'
+            },
+            {
+                benefit: 'Improved Motion Prediction',
+                explanation: 'Without continuous visual feedback, your cerebellum must predict target positions during blackout periods. This enhances predictive tracking ability.'
+            },
+            {
+                benefit: 'Faster Information Extraction',
+                explanation: 'Limited visual exposure time forces your brain to extract critical information (target position, movement direction) more efficiently. You learn to see "more" in less time.'
+            },
+            {
+                benefit: 'Reduced Visual Dependency',
+                explanation: 'Training with intermittent vision reduces over-reliance on continuous visual feedback, improving performance in chaotic/occluded game situations (smoke, flash, particle effects).'
+            }
+        ],
+        scienceBackground: 'Stroboscopic training has been used by professional athletes (Nike SPARQ, baseball, hockey) to improve dynamic visual acuity and reaction time. Studies show 4-8 weeks of strobe training can improve motion perception, attention, and anticipatory timing.',
+        recommendations: [
+            'Start with strobe OFF until you reach 50%+ difficulty in normal mode',
+            'Enable strobe for 1-2 modes at a time, not all at once',
+            'Strobe training is more fatiguing — reduce session duration by 30%',
+            'Most effective for Mode 2 (Tracking) and Mode 5 (Peripheral Vision)'
+        ],
+        warnings: [
+            'Strobe can trigger discomfort in photosensitive individuals',
+            'Do NOT use if you have epilepsy or seizure history',
+            'Stop immediately if you experience headache, nausea, or dizziness'
+        ]
+    },
+
+    // ===== ADAPTIVE DIFFICULTY (i+1) =====
+    adaptiveDifficulty: {
+        title: 'ADAPTIVE DIFFICULTY: THE i+1 PRINCIPLE',
+        concept: 'The system automatically adjusts difficulty to keep you in the optimal learning zone — challenging enough to improve, but not so hard that you fail repeatedly.',
+        origin: 'Based on Vygotsky\'s "Zone of Proximal Development" and Krashen\'s "i+1" hypothesis from language acquisition. Learning is maximized when tasks are slightly beyond current ability (i) plus one step (+1).',
+        
+        whyItMatters: [
+            'Prevents wasted time on tasks that are too easy (no learning occurs)',
+            'Prevents frustration from tasks that are impossibly hard (learned helplessness)',
+            'Maximizes time spent in the productive struggle zone',
+            'Allows automatic progression without manual difficulty management',
+            'Ensures challenge scales with your improving skill over weeks/months'
+        ],
+        tips: [
+            'Trust the system — don\'t try to manipulate difficulty by intentionally missing',
+            'Difficulty percentage shown in HUD reflects current challenge level',
+            'Higher difficulty = better training, but only if you can maintain ~75% accuracy',
+            'If stuck at low difficulty, focus on fundamentals (smooth movements, proper timing)'
+        ]
     }
 };
 

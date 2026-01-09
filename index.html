@@ -6,6 +6,7 @@
     <title>Neuro-Aim: Neural Training Protocol</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="training-guide.css">
 </head>
 <body>
 
@@ -16,7 +17,6 @@
     <div class="logo">
         <h1>NEURO-AIM</h1>
         <div class="subtitle">Neural-Optimized Training Protocol</div>
-        <!-- REMOVED VERSION NUMBER HERE -->
         <div class="version">7 MODES | ADAPTIVE DIFFICULTY</div>
     </div>
     
@@ -57,7 +57,7 @@
             <span class="tag">DISCRIMINATION + VISUOMOTOR</span>
         </div>
         
-        <!-- MODE 5 (UNIFIED STYLE - Removed 'new' class and badge) -->
+        <!-- MODE 5 -->
         <div class="mode-card" onclick="startGame(5)">
             <span class="mode-num">05</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(5)">?</button>
@@ -66,7 +66,7 @@
             <span class="tag">PPC + COVERT ATTENTION</span>
         </div>
         
-        <!-- MODE 6 (UNIFIED STYLE - Removed 'new' class and badge) -->
+        <!-- MODE 6 -->
         <div class="mode-card" onclick="startGame(6)">
             <span class="mode-num">06</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(6)">?</button>
@@ -75,7 +75,7 @@
             <span class="tag">dlPFC + SPATIAL MEMORY</span>
         </div>
         
-        <!-- MODE 7 (UNIFIED STYLE - Removed 'new' class and badge) -->
+        <!-- MODE 7 -->
         <div class="mode-card" onclick="startGame(7)">
             <span class="mode-num">07</span>
             <button class="info-btn" onclick="event.stopPropagation(); showModeInfo(7)">?</button>
@@ -87,6 +87,7 @@
     
     <div class="menu-nav">
         <a onclick="showScreen('stats-screen')">STATISTICS</a>
+        <a onclick="showTrainingGuide()">TRAINING GUIDE</a>
         <a onclick="showSettings()">SETTINGS</a>
     </div>
     
@@ -99,6 +100,397 @@
 <!-- ===== INFO MODAL ===== -->
 <div class="info-modal hidden" id="info-modal">
     <div class="info-content" id="info-content"></div>
+</div>
+
+<!-- ===== TRAINING GUIDE MODAL ===== -->
+<div class="training-guide-modal hidden" id="training-guide-modal">
+    <div class="training-guide-content">
+        <button class="close-btn" onclick="closeTrainingGuide()">✕</button>
+        
+        <h2>TRAINING GUIDE</h2>
+        
+        <!-- Tab Navigation -->
+        <div class="guide-tabs">
+            <button class="guide-tab active" onclick="showGuideSection('pathways')">Neural Pathways</button>
+            <button class="guide-tab" onclick="showGuideSection('improvement')">When Will I Improve?</button>
+            <button class="guide-tab" onclick="showGuideSection('protocol')">Training Protocol</button>
+            <button class="guide-tab" onclick="showGuideSection('strobe')">Strobe Mode</button>
+            <button class="guide-tab" onclick="showGuideSection('adaptive')">i+1 Difficulty</button>
+        </div>
+        
+        <!-- SECTION: Neural Pathways -->
+        <div class="guide-section active" id="section-pathways">
+            <h3>🧠 NEURAL PATHWAYS OF AIMING</h3>
+            <p class="guide-intro">Different aiming skills rely on distinct neural circuits. Understanding these pathways helps you train systematically.</p>
+            
+            <div class="pathway-grid">
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">👁️</span>
+                        <h4>Visual Detection Pipeline</h4>
+                    </div>
+                    <div class="pathway-regions">V1 (Primary Visual Cortex) → V4 (Color/Form) → MT/V5 (Motion)</div>
+                    <div class="pathway-function">Initial target detection, distinguishing targets from background, motion perception</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 1: Gabor Scout, Mode 5: Parafoveal Ghost
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Spotting enemies in cluttered environments, detecting movement
+                    </div>
+                </div>
+                
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">⚡</span>
+                        <h4>Saccadic Targeting System</h4>
+                    </div>
+                    <div class="pathway-regions">Frontal Eye Fields (FEF) → Superior Colliculus → Parietal Cortex</div>
+                    <div class="pathway-function">Rapid eye movements to acquire targets, coordinate eye-hand movements</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 4: Landolt Saccade, Mode 5: Parafoveal Ghost
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Flick shots, quick target acquisition, scanning for enemies
+                    </div>
+                </div>
+                
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">🎯</span>
+                        <h4>Smooth Pursuit & Prediction</h4>
+                    </div>
+                    <div class="pathway-regions">Cerebellum → MT/V5 → Supplementary Eye Fields</div>
+                    <div class="pathway-function">Tracking moving targets, predicting future positions</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 2: Pure Tracking
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Tracking strafing enemies, leading shots, spray control
+                    </div>
+                </div>
+                
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">🔬</span>
+                        <h4>Precision Motor Control</h4>
+                    </div>
+                    <div class="pathway-regions">Premotor Cortex → Primary Motor Cortex → Basal Ganglia</div>
+                    <div class="pathway-function">Fine motor adjustments, stopping movement precisely</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 3: Surgical Lock
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Micro-adjustments, headshot precision, avoiding overflick
+                    </div>
+                </div>
+                
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">🗺️</span>
+                        <h4>Spatial Working Memory</h4>
+                    </div>
+                    <div class="pathway-regions">Dorsolateral Prefrontal Cortex (dlPFC) → Posterior Parietal Cortex</div>
+                    <div class="pathway-function">Maintaining spatial positions in memory, multi-target awareness</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 6: Memory Sequencer
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Tracking multiple enemies, remembering positions through smoke/cover
+                    </div>
+                </div>
+                
+                <div class="pathway-card">
+                    <div class="pathway-header">
+                        <span class="pathway-icon">🔄</span>
+                        <h4>Executive Control & Flexibility</h4>
+                    </div>
+                    <div class="pathway-regions">Anterior Cingulate Cortex (ACC) → Prefrontal Cortex</div>
+                    <div class="pathway-function">Rule switching, conflict monitoring, inhibiting wrong responses</div>
+                    <div class="pathway-trained">
+                        <strong>Trained by:</strong> Mode 7: Cognitive Switch
+                    </div>
+                    <div class="pathway-fps">
+                        <strong>FPS Application:</strong> Adapting to changing situations, avoiding friendly fire, mode transitions
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SECTION: When Will I Improve -->
+        <div class="guide-section" id="section-improvement">
+            <h3>⏰ WHEN WILL I IMPROVE?</h3>
+            
+            <div class="improvement-timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker warning">!</div>
+                    <div class="timeline-content">
+                        <h4>Not Immediately After Training</h4>
+                        <p>Your performance may actually <strong>decline</strong> immediately after an intense session. This is normal — your neural circuits are fatigued and undergoing reorganization. Do not judge progress by post-session performance.</p>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker sleep">💤</div>
+                    <div class="timeline-content">
+                        <h4>Sleep Is When Learning Consolidates</h4>
+                        <p>Neural plasticity — the actual strengthening of synaptic connections — occurs primarily <strong>during sleep</strong>, especially during REM and slow-wave sleep phases. The brain replays and consolidates motor patterns learned during waking hours. One night of quality sleep can improve performance by <strong>20-30%</strong> on motor tasks.</p>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">48h</div>
+                    <div class="timeline-content">
+                        <h4>The 48-72 Hour Window</h4>
+                        <p>Measurable improvement typically appears <strong>1-3 days</strong> after training, assuming adequate sleep. This is when neural consolidation completes and new pathways are fully integrated.</p>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">2-4w</div>
+                    <div class="timeline-content">
+                        <h4>Cumulative Adaptation (2-4 Weeks)</h4>
+                        <p>Structural neural changes (increased myelination, dendritic growth) require consistent training over weeks. Expect significant, stable improvement after <strong>2-4 weeks</strong> of regular practice.</p>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-marker">📈</div>
+                    <div class="timeline-content">
+                        <h4>Plateau & Breakthrough Cycles</h4>
+                        <p>Skill development follows a step-function pattern. You will experience plateaus where improvement stalls. <strong>Continue training</strong> — breakthroughs often occur suddenly after apparent stagnation.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sleep-tips">
+                <h4>🌙 Sleep Recommendations for Optimal Learning</h4>
+                <ul>
+                    <li>Aim for <strong>7-9 hours</strong> of sleep per night</li>
+                    <li>Training before sleep (evening sessions) may enhance consolidation</li>
+                    <li>Avoid alcohol after training — it disrupts REM sleep and consolidation</li>
+                    <li>Naps (20-90 min) can accelerate motor learning if sleep-deprived</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- SECTION: Training Protocol -->
+        <div class="guide-section" id="section-protocol">
+            <h3>📋 RECOMMENDED TRAINING PROTOCOL</h3>
+            
+            <div class="protocol-principles">
+                <div class="principle">
+                    <h4>Focused Practice > Marathon Sessions</h4>
+                    <p>Short, focused sessions (10-20 min per mode) outperform long, fatigued sessions. Quality of attention matters more than total time.</p>
+                </div>
+                <div class="principle">
+                    <h4>Distributed Practice</h4>
+                    <p>Multiple short sessions across days beat one long session. Sleep between sessions allows consolidation.</p>
+                </div>
+                <div class="principle">
+                    <h4>Train Weaknesses, Not Strengths</h4>
+                    <p>Identify your weakest modes and prioritize them. Comfortable training is often ineffective training.</p>
+                </div>
+            </div>
+            
+            <h4>Daily Recommendations by Mode</h4>
+            <div class="mode-recommendations">
+                <div class="mode-rec">
+                    <span class="mode-rec-num">01</span>
+                    <div class="mode-rec-info">
+                        <strong>Gabor Scout</strong>
+                        <span class="rec-duration">5-10 min</span>
+                        <span class="rec-freq">3-4x per week</span>
+                    </div>
+                    <p>Best as a warm-up. Primes visual cortex for other tasks.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">02</span>
+                    <div class="mode-rec-info">
+                        <strong>Pure Tracking</strong>
+                        <span class="rec-duration">10-15 min</span>
+                        <span class="rec-freq">Daily</span>
+                    </div>
+                    <p>Core tracking skill. Essential for most FPS games. Can extend to 20 min if tracking is a weakness.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">03</span>
+                    <div class="mode-rec-info">
+                        <strong>Surgical Lock</strong>
+                        <span class="rec-duration">5-10 min</span>
+                        <span class="rec-freq">3-4x per week</span>
+                    </div>
+                    <p>Highly demanding. Shorter sessions prevent frustration. Quality over quantity.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">04</span>
+                    <div class="mode-rec-info">
+                        <strong>Landolt Saccade</strong>
+                        <span class="rec-duration">5-10 min</span>
+                        <span class="rec-freq">Daily</span>
+                    </div>
+                    <p>Critical for flick-heavy games (Valorant, CS). Short sessions, high frequency optimal.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">05</span>
+                    <div class="mode-rec-info">
+                        <strong>Parafoveal Ghost</strong>
+                        <span class="rec-duration">10-15 min</span>
+                        <span class="rec-freq">3-4x per week</span>
+                    </div>
+                    <p>Cognitively demanding. Avoid when mentally fatigued.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">06</span>
+                    <div class="mode-rec-info">
+                        <strong>Memory Sequencer</strong>
+                        <span class="rec-duration">5-10 min</span>
+                        <span class="rec-freq">2-3x per week</span>
+                    </div>
+                    <p>Working memory training. Benefits plateau quickly — diminishing returns after 10 min.</p>
+                </div>
+                
+                <div class="mode-rec">
+                    <span class="mode-rec-num">07</span>
+                    <div class="mode-rec-info">
+                        <strong>Cognitive Switch</strong>
+                        <span class="rec-duration">5-10 min</span>
+                        <span class="rec-freq">2-3x per week</span>
+                    </div>
+                    <p>Best done when mentally fresh. Avoid late-night sessions.</p>
+                </div>
+            </div>
+            
+            <h4>Sample Routines</h4>
+            <div class="sample-routines">
+                <div class="routine-card">
+                    <h5>Quick Warm-Up (15 min)</h5>
+                    <div class="routine-flow">Mode 1 (5 min) → Mode 4 (5 min) → Mode 2 (5 min)</div>
+                    <p>Use before ranked games</p>
+                </div>
+                <div class="routine-card">
+                    <h5>Full Training Session (45 min)</h5>
+                    <div class="routine-flow">Mode 1 (5 min) → Mode 2 (15 min) → Mode 3 (10 min) → Mode 4 (10 min) → Rest</div>
+                    <p>Dedicated training day</p>
+                </div>
+                <div class="routine-card">
+                    <h5>Cognitive Focus (25 min)</h5>
+                    <div class="routine-flow">Mode 5 (10 min) → Mode 7 (10 min) → Mode 6 (5 min)</div>
+                    <p>Training awareness and decision-making</p>
+                </div>
+            </div>
+            
+            <div class="protocol-warnings">
+                <h4>⚠️ Warnings</h4>
+                <ul>
+                    <li>Do NOT train for more than <strong>60 minutes total</strong> per day — diminishing returns and fatigue</li>
+                    <li>Stop if experiencing eye strain, headache, or frustration</li>
+                    <li>Rest at least <strong>1 day per week</strong> (active recovery)</li>
+                    <li>Avoid training immediately before important matches — temporary fatigue can hurt performance</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- SECTION: Strobe Mode -->
+        <div class="guide-section" id="section-strobe">
+            <h3>💡 STROBE MODE: TEMPORAL OCCLUSION TRAINING</h3>
+            
+            <div class="strobe-overview">
+                <div class="strobe-what">
+                    <h4>What It Does</h4>
+                    <p>Strobe mode periodically blacks out the screen (3-6 Hz), forcing your brain to process visual information in <strong>discrete snapshots</strong> rather than continuous flow.</p>
+                </div>
+                <div class="strobe-how">
+                    <h4>How to Enable</h4>
+                    <p>Go to <strong>Settings → Strobe Mode</strong> → Toggle ON for each mode individually.</p>
+                </div>
+            </div>
+            
+            <h4>Benefits</h4>
+            <div class="strobe-benefits">
+                <div class="strobe-benefit">
+                    <h5>🧠 Enhanced Visual Memory</h5>
+                    <p>When vision is interrupted, your brain must retain the last visual frame longer. This strengthens <strong>iconic memory</strong> — the brief visual buffer that persists after stimuli disappear.</p>
+                </div>
+                <div class="strobe-benefit">
+                    <h5>🎯 Improved Motion Prediction</h5>
+                    <p>Without continuous visual feedback, your cerebellum must predict target positions during blackout periods. This enhances <strong>predictive tracking ability</strong>.</p>
+                </div>
+                <div class="strobe-benefit">
+                    <h5>⚡ Faster Information Extraction</h5>
+                    <p>Limited visual exposure time forces your brain to extract critical information (target position, movement direction) more efficiently. You learn to see <strong>"more" in less time</strong>.</p>
+                </div>
+                <div class="strobe-benefit">
+                    <h5>💨 Reduced Visual Dependency</h5>
+                    <p>Training with intermittent vision reduces over-reliance on continuous visual feedback, improving performance in chaotic/occluded game situations (smoke, flash, particle effects).</p>
+                </div>
+            </div>
+            
+            <div class="strobe-science">
+                <h4>Scientific Background</h4>
+                <p>Stroboscopic training has been used by professional athletes (Nike SPARQ, baseball, hockey) to improve dynamic visual acuity and reaction time. Studies show <strong>4-8 weeks</strong> of strobe training can improve motion perception, attention, and anticipatory timing.</p>
+            </div>
+            
+            <div class="strobe-recommendations">
+                <h4>Recommendations</h4>
+                <ul>
+                    <li>Start with strobe OFF until you reach <strong>50%+ difficulty</strong> in normal mode</li>
+                    <li>Enable strobe for 1-2 modes at a time, not all at once</li>
+                    <li>Strobe training is more fatiguing — <strong>reduce session duration by 30%</strong></li>
+                    <li>Most effective for <strong>Mode 2 (Tracking)</strong> and <strong>Mode 5 (Peripheral Vision)</strong></li>
+                </ul>
+            </div>
+            
+            <div class="strobe-warnings">
+                <h4>⚠️ Health Warnings</h4>
+                <ul>
+                    <li>Strobe can trigger discomfort in photosensitive individuals</li>
+                    <li><strong>Do NOT use if you have epilepsy or seizure history</strong></li>
+                    <li>Stop immediately if you experience headache, nausea, or dizziness</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- SECTION: Adaptive Difficulty -->
+        <div class="guide-section" id="section-adaptive">
+            <h3>📊 ADAPTIVE DIFFICULTY: THE i+1 PRINCIPLE</h3>
+            
+            <div class="adaptive-concept">
+                <h4>The Concept</h4>
+                <p>The system automatically adjusts difficulty to keep you in the <strong>optimal learning zone</strong> — challenging enough to improve, but not so hard that you fail repeatedly.</p>
+                
+                <h4>Origin</h4>
+                <p>Based on Vygotsky's "Zone of Proximal Development" and Krashen's "i+1" hypothesis from language acquisition. Learning is maximized when tasks are slightly beyond current ability (<strong>i</strong>) plus one step (<strong>+1</strong>).</p>
+            </div>
+
+
+            
+            <div class="adaptive-why">
+                <h4>Why It Matters</h4>
+                <ul>
+                    <li>Prevents wasted time on tasks that are too easy (no learning occurs)</li>
+                    <li>Prevents frustration from tasks that are impossibly hard (learned helplessness)</li>
+                    <li>Maximizes time spent in the productive struggle zone</li>
+                    <li>Allows automatic progression without manual difficulty management</li>
+                    <li>Ensures challenge scales with your improving skill over weeks/months</li>
+                </ul>
+            </div>
+            
+            <div class="adaptive-tips">
+                <h4>Tips</h4>
+                <ul>
+                    <li>Trust the system — don't try to manipulate difficulty by intentionally missing</li>
+                    <li>Difficulty percentage shown in HUD reflects current challenge level</li>
+                    <li>Higher difficulty = better training, but only if you can keep accuracy</li>
+                    <li>If stuck at low difficulty, focus on fundamentals (smooth movements, proper timing)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ===== SETTINGS MODAL ===== -->
@@ -321,6 +713,32 @@
 <script src="js/game-engine.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+
+<script>
+// Training Guide Functions
+function showTrainingGuide() {
+    document.getElementById('training-guide-modal').classList.remove('hidden');
+}
+
+function closeTrainingGuide() {
+    document.getElementById('training-guide-modal').classList.add('hidden');
+}
+
+function showGuideSection(sectionId) {
+    // Update tabs
+    document.querySelectorAll('.guide-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelector(`.guide-tab[onclick*="${sectionId}"]`).classList.add('active');
+    
+    // Update sections
+    document.querySelectorAll('.guide-section').forEach(section => section.classList.remove('active'));
+    document.getElementById('section-' + sectionId).classList.add('active');
+}
+
+// Close modal on outside click
+document.getElementById('training-guide-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeTrainingGuide();
+});
+</script>
 
 </body>
 </html>

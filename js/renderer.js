@@ -1,6 +1,6 @@
 // ==================== RENDERER ====================
 // All canvas drawing functions for 7 modes
-// UPDATED: Mode 1 Gabor Logic (Global Contrast), Mode 7 Dual-Border System
+// UPDATED: Mode 1 unified opacity, Mode 3 color similarity, Mode 5 integrity bar
 
 // ===== MODE 1: GABOR =====
 function drawMode1(ctx) {
@@ -8,59 +8,55 @@ function drawMode1(ctx) {
     if (!t) return;
     if (currentStrobeEnabled && typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
     
-    // Gabor Theory Update:
-    // To train V1, the target shouldn't just fade out (which might make it pop if noise is dark).
-    // Instead, we render the target first, and then allow the NoiseSystem to render ON TOP of it.
-    // The difficulty (t.contrast) should control how distinct the Gabor patch is relative to the background.
-    
-    // 1. Draw Target (Base contrast controlled by difficulty)
-    // We use 'destination-over' or just draw before noise if noise has alpha.
-    // Assuming NoiseSystem.draw() is called AFTER this in game-engine.js.
-    
+    // UPDATED: Render target with SAME base opacity as noise
+    // The challenge comes from orientation (vertical vs horizontal), not opacity
     drawGaborPatch(ctx, t.x, t.y, t.size, true, t.contrast);
 }
 
 function drawGaborPatch(ctx, x, y, size, isVertical, contrast) {
     ctx.save();
     
-    // Contrast Handling:
-    // High difficulty = Low contrast. 
-    // We map contrast (1.0 to 0.15) directly to globalAlpha.
-    // CRITICAL CHANGE: The Noise System must also be drawn with parameters that make separation hard.
-    // For now, making the target faint is correct, BUT the noise must visually compete with it.
+    // UPDATED: Gaussian Envelope (高斯模糊) - Enhanced visibility
+    var tempCanvas = document.createElement('canvas');
+    var tempSize = size * 3;
+    tempCanvas.width = tempSize;
+    tempCanvas.height = tempSize;
+    var tempCtx = tempCanvas.getContext('2d');
     
-    ctx.globalAlpha = Math.max(contrast, 0.05); // Allow going very faint
+    var cx = tempSize / 2;
+    var cy = tempSize / 2;
     
-    // Gabor Patch color - Neutral Grey to blend with noise
-    ctx.strokeStyle = 'rgba(180, 180, 180, 1.0)';
-    ctx.lineWidth = 3;
-    
-    // Gaussian Window (The "Patch" part)
-    // Create a radial gradient to mask the edges softly
-    var g = ctx.createRadialGradient(x, y, 0, x, y, size);
-    g.addColorStop(0, 'rgba(128, 128, 128, 1)'); // Opaque center
-    g.addColorStop(0.5, 'rgba(128, 128, 128, 0.5)'); 
-    g.addColorStop(1, 'rgba(128, 128, 128, 0)');   // Transparent edge
-    
-    // We draw the grating pattern masked by this gradient
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI*2);
-    ctx.clip(); // Clip drawing to the circle
-    
+    // Step 1: Draw grating pattern
+    tempCtx.strokeStyle = 'rgb(180, 180, 180)';
+    tempCtx.lineWidth = 3;
     var step = 6;
-    var drawSize = size;
     
-    ctx.beginPath();
-    for (var i = -drawSize; i < drawSize; i += step) {
+    tempCtx.beginPath();
+    for (var i = -tempSize; i < tempSize; i += step) {
         if (isVertical) {
-            ctx.moveTo(x + i, y - drawSize);
-            ctx.lineTo(x + i, y + drawSize);
+            tempCtx.moveTo(cx + i, 0);
+            tempCtx.lineTo(cx + i, tempSize);
         } else {
-            ctx.moveTo(x - drawSize, y + i);
-            ctx.lineTo(x + drawSize, y + i);
+            tempCtx.moveTo(0, cy + i);
+            tempCtx.lineTo(tempSize, cy + i);
         }
     }
-    ctx.stroke();
+    tempCtx.stroke();
+    
+    // Step 2: Apply Gaussian envelope (更强的高斯衰减)
+    tempCtx.globalCompositeOperation = 'destination-in';
+    var gradient = tempCtx.createRadialGradient(cx, cy, 0, cx, cy, size * 1.0);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');      // Full opacity at center
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.7)');    // Stronger Gaussian falloff
+    gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.3)');    // More gradual fade
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');        // Transparent at edge
+    tempCtx.fillStyle = gradient;
+    tempCtx.fillRect(0, 0, tempSize, tempSize);
+    
+    // Step 3: Draw to main canvas with contrast
+    var alpha = Math.max(0.3, Math.min(1.0, contrast));
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(tempCanvas, x - size * 1.5, y - size * 1.5);
     
     ctx.restore();
 }
@@ -129,12 +125,11 @@ function drawMode2(ctx) {
         ctx.stroke();
     }
     
-    // VISUAL FEEDBACK FOR CONTINUOUS SCORING
-    // If tracking, show small +1 particles or glow intensity change
     if (mode2State.isLocked) {
         ctx.globalAlpha = 0.5 + Math.sin(performance.now() * 0.02) * 0.2;
         ctx.font = '10px JetBrains Mono';
         ctx.fillStyle = '#00ff99';
+        ctx.textAlign = 'center';
         ctx.fillText('+TRACKING', t.x, t.y - t.size - 10);
     }
     
@@ -148,24 +143,45 @@ function drawMode3(ctx) {
     if (currentStrobeEnabled && typeof NoiseSystem !== 'undefined' && NoiseSystem.isBlindPhase) return;
     
     ctx.save();
+    
+    // UPDATED: Yellow color scheme with opacity decay
+    var similarity = t.colorSimilarity || 0;
+    
+    // Base colors - Both yellow
+    var coreR = 255, coreG = 204, coreB = 0;   // Bright Yellow #ffcc00 (core/target)
+    var haloR = 255, haloG = 180, haloB = 0;   // Orange-Yellow #ffb400 (halo/penalty)
+    
+    // Interpolate halo towards core as similarity increases (linear progression)
+    var blendedHaloR = Math.round(haloR + (coreR - haloR) * similarity);
+    var blendedHaloG = Math.round(haloG + (coreG - haloG) * similarity);
+    var blendedHaloB = Math.round(haloB + (coreB - haloB) * similarity);
+    
+    // Opacity decay with difficulty (1.0 → 0.05, never below 5%)
+    var baseOpacity = Math.max(0.05, 1.0 - similarity * 0.95);  // 100% → 5%
+    var haloOpacity = Math.max(0.05, 0.15 + (1.0 - similarity) * 0.3);  // Halo fill
+    var haloStrokeOpacity = Math.max(0.05, 0.4 + (1.0 - similarity) * 0.4);  // Halo stroke
+    
+    // Halo (penalty zone) - gets more like core as difficulty increases
     ctx.beginPath();
     ctx.arc(t.x, t.y, t.penaltySize, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 217, 255, 0.15)'; 
-    ctx.strokeStyle = 'rgba(0, 217, 255, 0.4)'; 
-    ctx.lineWidth = 1;
+    ctx.fillStyle = `rgba(${blendedHaloR}, ${blendedHaloG}, ${blendedHaloB}, ${haloOpacity})`;
+    ctx.strokeStyle = `rgba(${blendedHaloR}, ${blendedHaloG}, ${blendedHaloB}, ${haloStrokeOpacity})`;
+    ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
     
+    // Core (target) - bright yellow with opacity decay
     ctx.beginPath();
     ctx.arc(t.coreX, t.coreY, t.coreSize, 0, Math.PI * 2);
-    ctx.fillStyle = '#00d9ff';
-    ctx.shadowColor = '#00d9ff';
-    ctx.shadowBlur = 20;
+    ctx.fillStyle = `rgba(${coreR}, ${coreG}, ${coreB}, ${baseOpacity})`;
+    ctx.shadowColor = `rgba(${coreR}, ${coreG}, ${coreB}, ${baseOpacity * 0.8})`;
+    ctx.shadowBlur = 20 * (1 - similarity * 0.5);  // Reduced glow at high difficulty
     ctx.fill();
     
+    // Center dot - also yellow, slightly brighter
     ctx.beginPath();
     ctx.arc(t.coreX, t.coreY, 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = `rgba(255, 220, 100, ${Math.max(0.2, baseOpacity)})`;  // Lighter yellow
     ctx.shadowBlur = 0;
     ctx.fill();
     ctx.restore();
@@ -251,21 +267,29 @@ function drawMode5(ctx) {
         ctx.lineWidth = 2;
         ctx.stroke();
         
+        // UPDATED: Use integrity field for progress bar
         var radius = p.size + 15;
         var startAngle = Math.PI * 0.7;
         var endAngle = Math.PI * 2.3;
         var range = endAngle - startAngle;
-        var currentEnd = startAngle + range * mode5State.integrity;
+        var integrity = mode5State.integrity !== undefined ? mode5State.integrity : 1.0;
+        var currentEnd = startAngle + range * integrity;
+        
+        // Background arc
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius, startAngle, endAngle);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.lineWidth = 4;
         ctx.stroke();
+        
+        // Progress arc
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius, startAngle, currentEnd);
-        ctx.strokeStyle = mode5State.integrity > 0.5 ? '#00d9ff' : '#ff3366';
+        ctx.strokeStyle = integrity > 0.5 ? '#00d9ff' : '#ff3366';
         ctx.lineWidth = 4;
         ctx.stroke();
+        
+        // Label
         ctx.font = '10px JetBrains Mono';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.textAlign = 'center';
@@ -308,6 +332,35 @@ function drawMode6(ctx) {
     
     ctx.save();
     
+    // Waiting phase - no display, just pause
+    if (phase === 'waiting') {
+        ctx.restore();
+        return;
+    }
+    
+    // Complete phase - show all completed targets with green feedback
+    if (phase === 'complete') {
+        for (var i = 0; i < seq.length; i++) {
+            var t = seq[i];
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 255, 150, 0.5)';
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(i + 1, t.x, t.y);
+        }
+        ctx.font = '18px JetBrains Mono';
+        ctx.fillStyle = '#00ff99';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('SEQUENCE COMPLETE!', canvasWidth / 2, 80);
+        ctx.restore();
+        return;
+    }
+    
     if (phase === 'display') {
         if (mode6State.displayIndex < seq.length) {
             var t = seq[mode6State.displayIndex];
@@ -335,7 +388,7 @@ function drawMode6(ctx) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('RECALL IN...', canvasWidth / 2, canvasHeight / 2);
-    } else if (phase === 'recall' || phase === 'next_round') {
+    } else if (phase === 'recall') {
         for (var i = 0; i < seq.length; i++) {
             var t = seq[i];
             var isDone = i < mode6State.currentIndex;
@@ -351,26 +404,11 @@ function drawMode6(ctx) {
                 ctx.fillText(i + 1, t.x, t.y);
             }
         }
-        if (phase === 'next_round') {
-             ctx.font = '24px Orbitron';
-             ctx.fillStyle = '#00ff99';
-             ctx.textAlign = 'center';
-             ctx.textBaseline = 'middle';
-             ctx.fillText('SEQUENCE COMPLETE', canvasWidth / 2, canvasHeight / 2 - 50);
-             var barW = 200;
-             var barH = 4;
-             var progress = mode6State.nextRoundTimer / 1000;
-             ctx.fillStyle = 'rgba(255,255,255,0.2)';
-             ctx.fillRect(canvasWidth/2 - barW/2, canvasHeight/2 - 20, barW, barH);
-             ctx.fillStyle = '#00ff99';
-             ctx.fillRect(canvasWidth/2 - barW/2, canvasHeight/2 - 20, barW * progress, barH);
-        } else {
-             ctx.font = '14px JetBrains Mono';
-             ctx.fillStyle = '#00d9ff';
-             ctx.textAlign = 'center';
-             ctx.textBaseline = 'top';
-             ctx.fillText('RECALL: ' + mode6State.currentIndex + '/' + seq.length, canvasWidth / 2, 80);
-        }
+        ctx.font = '14px JetBrains Mono';
+        ctx.fillStyle = '#00d9ff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('RECALL: ' + mode6State.currentIndex + '/' + seq.length, canvasWidth / 2, 80);
     }
     ctx.restore();
 }
@@ -384,42 +422,38 @@ function drawMode7(ctx) {
     var isWarm = rule === 'warm';
     
     ctx.save();
-    var ruleColor = isWarm ? '#ff8844' : '#4488ff'; // Rule Env Color (Background Hint)
-    var targetColor = isWarm ? '#00ff99' : '#ff3366'; // Target Color (Direct Cue)
+    var ruleColor = isWarm ? '#ff8844' : '#4488ff';
+    var targetColor = isWarm ? '#00ff99' : '#ff3366';
     
     var pulse = 0;
-    // Pulse logic
     if (mode7State.switchTimer > CFG.mode7.params.switchInterval - 300) {
-        pulse = 1.0; // Fresh switch pulse
+        pulse = 1.0;
     } else if (mode7State.warningActive) {
-        pulse = Math.sin(performance.now() * 0.02) * 0.5 + 0.5; // Warning pulse
+        pulse = Math.sin(performance.now() * 0.02) * 0.5 + 0.5;
     }
     
-    // 1. Dual Border Indicator
-    // Inner Border: Rule Color (Ambient)
+    // Dual Border Indicator
     ctx.lineWidth = 10;
     ctx.strokeStyle = ruleColor;
     ctx.globalAlpha = 0.4;
     ctx.strokeRect(20, 20, canvasWidth - 40, canvasHeight - 40);
     
-    // Outer Border: TARGET Color (Actionable) - NEW
     ctx.lineWidth = 15 + (pulse * 10);
     ctx.strokeStyle = targetColor;
     ctx.globalAlpha = 0.8 + (pulse * 0.2);
     ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
     
-    // 2. HUD Rule Indicator (BOTTOM)
+    // HUD Rule Indicator
     var hudW = 320;
     var hudH = 50;
     var hudX = canvasWidth / 2 - hudW / 2;
-    var hudY = canvasHeight - 80; 
+    var hudY = canvasHeight - 80;
     
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = 'rgba(10, 15, 20, 0.9)';
-    ctx.strokeStyle = targetColor; // Border matches target
+    ctx.strokeStyle = targetColor;
     ctx.lineWidth = 3;
     
-    // Pill shape
     ctx.beginPath();
     ctx.roundRect(hudX, hudY, hudW, hudH, 10);
     ctx.fill();
@@ -436,15 +470,13 @@ function drawMode7(ctx) {
     ctx.fillText(ruleText, canvasWidth / 2, hudY + hudH / 2);
     ctx.shadowBlur = 0;
     
-    // 3. GIANT COUNTDOWN (Priming Color)
+    // Countdown
     if (mode7State.warningActive) {
         var secondsLeft = Math.ceil(mode7State.switchTimer / 1000);
         
-        // Show 3, 2, 1
-        if (secondsLeft <= 4 && secondsLeft > 0) { // Updated to 4s to match config
-            // Determine NEXT rule to prime color
+        if (secondsLeft <= 4 && secondsLeft > 0) {
             var nextIsWarm = !isWarm;
-            var nextTargetColor = nextIsWarm ? '#00ff99' : '#ff3366'; // Green vs Red
+            var nextTargetColor = nextIsWarm ? '#00ff99' : '#ff3366';
             
             ctx.save();
             ctx.fillStyle = nextTargetColor;
@@ -466,7 +498,7 @@ function drawMode7(ctx) {
     
     ctx.restore();
     
-    // 4. Targets
+    // Targets
     ctx.save();
     for (var i = 0; i < targets.length; i++) {
         var t = targets[i];
